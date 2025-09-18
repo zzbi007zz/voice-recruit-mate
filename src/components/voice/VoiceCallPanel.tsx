@@ -19,6 +19,7 @@ import {
   Settings
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface CallSession {
   id: string;
@@ -66,7 +67,7 @@ export const VoiceCallPanel = () => {
     },
   ]);
 
-  const handleStartCall = () => {
+  const handleStartCall = async () => {
     if (!selectedCandidate) {
       toast.error('Please select a candidate to call');
       return;
@@ -75,7 +76,7 @@ export const VoiceCallPanel = () => {
     const candidate = candidates.find(c => c.id === selectedCandidate);
     if (!candidate) return;
 
-    // In a real app, this would integrate with your voice AI service
+    // Start the call process
     setCurrentCall({
       id: Date.now().toString(),
       candidateName: candidate.name,
@@ -84,12 +85,35 @@ export const VoiceCallPanel = () => {
       status: 'connecting',
     });
 
-    // Simulate connection
-    setTimeout(() => {
-      setCurrentCall(prev => prev ? { ...prev, status: 'active' } : null);
-      setIsRecording(true);
-      toast.success('Call connected successfully!');
-    }, 2000);
+    try {
+      // Call the Supabase edge function to initiate Twilio call
+      const { data, error } = await supabase.functions.invoke('initiate-call', {
+        body: {
+          candidatePhone: candidate.phone,
+          candidateName: candidate.name,
+          aiPrompt: aiPrompt,
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data?.success) {
+        // Update call status to active
+        setTimeout(() => {
+          setCurrentCall(prev => prev ? { ...prev, status: 'active' } : null);
+          setIsRecording(true);
+          toast.success(`Call connected to ${candidate.name}!`);
+        }, 2000);
+      } else {
+        throw new Error(data?.error || 'Failed to initiate call');
+      }
+    } catch (error) {
+      console.error('Error initiating call:', error);
+      toast.error('Failed to initiate call. Please check your Twilio configuration.');
+      setCurrentCall(null);
+    }
   };
 
   const handleEndCall = () => {
@@ -159,8 +183,8 @@ export const VoiceCallPanel = () => {
             <Alert>
               <Info className="h-4 w-4" />
               <AlertDescription>
-                <strong>Note:</strong> AI voice calling requires backend integration with services like ElevenLabs. 
-                Connect your project to Supabase to enable this functionality.
+                <strong>Ready!</strong> AI voice calling is now integrated with Twilio and ElevenLabs. 
+                Make sure your Twilio phone number is configured and you have sufficient credits.
               </AlertDescription>
             </Alert>
           </CardContent>
