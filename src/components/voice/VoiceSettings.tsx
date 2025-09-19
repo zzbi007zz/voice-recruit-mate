@@ -15,10 +15,8 @@ interface VoiceSettingsProps {
 }
 
 export interface VoiceSettings {
-  twilioAccountSid: string;
-  twilioAuthToken: string;
-  twilioPhoneNumber: string;
-  elevenlabsApiKey: string;
+  vbeeApiKey: string;
+  vbeeVoiceId: string;
   maxCallDuration: number; // minutes
   enableCallTimeWarning: boolean;
   warningTime: number; // minutes before end
@@ -29,10 +27,8 @@ export interface VoiceSettings {
 
 export const VoiceSettings = ({ onSettingsChange }: VoiceSettingsProps) => {
   const [settings, setSettings] = useState<VoiceSettings>({
-    twilioAccountSid: '',
-    twilioAuthToken: '',
-    twilioPhoneNumber: '',
-    elevenlabsApiKey: '',
+    vbeeApiKey: '',
+    vbeeVoiceId: 'vi-female-1', // Default Vietnamese female voice
     maxCallDuration: 30,
     enableCallTimeWarning: true,
     warningTime: 5,
@@ -65,15 +61,15 @@ export const VoiceSettings = ({ onSettingsChange }: VoiceSettingsProps) => {
 
   const handleSave = () => {
     // Validate required fields
-    if (!settings.twilioAccountSid || !settings.twilioAuthToken || !settings.elevenlabsApiKey) {
-      toast.error('Vui lòng nhập đầy đủ API keys để sử dụng tính năng gọi điện');
+    if (!settings.vbeeApiKey) {
+      toast.error('Vui lòng nhập vBee API Key để sử dụng tính năng gọi điện AI');
       return;
     }
 
     toast.success('Cài đặt đã được lưu thành công!');
   };
 
-  const isConfigured = settings.twilioAccountSid && settings.twilioAuthToken && settings.elevenlabsApiKey;
+  const isConfigured = settings.vbeeApiKey;
 
   return (
     <div className="space-y-6">
@@ -93,15 +89,15 @@ export const VoiceSettings = ({ onSettingsChange }: VoiceSettingsProps) => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Key className="h-5 w-5" />
-            Cấu hình API Keys
+            Cấu hình vBee API
           </CardTitle>
           <CardDescription>
-            Nhập các API keys cần thiết để sử dụng dịch vụ gọi điện
+            Nhập API key và cấu hình giọng nói vBee cho dịch vụ gọi điện AI
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between mb-4">
-            <Label>Hiển thị API Keys</Label>
+            <Label>Hiển thị API Key</Label>
             <Switch 
               checked={showApiKeys} 
               onCheckedChange={setShowApiKeys}
@@ -110,46 +106,40 @@ export const VoiceSettings = ({ onSettingsChange }: VoiceSettingsProps) => {
 
           <div className="space-y-4">
             <div>
-              <Label htmlFor="twilioSid">Twilio Account SID</Label>
+              <Label htmlFor="vbeeApiKey">vBee API Key</Label>
               <Input
-                id="twilioSid"
+                id="vbeeApiKey"
                 type={showApiKeys ? "text" : "password"}
-                value={settings.twilioAccountSid}
-                onChange={(e) => handleSettingChange('twilioAccountSid', e.target.value)}
-                placeholder="AC..."
+                value={settings.vbeeApiKey}
+                onChange={(e) => handleSettingChange('vbeeApiKey', e.target.value)}
+                placeholder="vbee_api_key_••••••••••••••••"
               />
+              <p className="text-sm text-muted-foreground mt-1">
+                Lấy API key từ{' '}
+                <a href="https://vbee.ai/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                  vBee.ai
+                </a>
+              </p>
             </div>
 
             <div>
-              <Label htmlFor="twilioToken">Twilio Auth Token</Label>
-              <Input
-                id="twilioToken"
-                type={showApiKeys ? "text" : "password"}
-                value={settings.twilioAuthToken}
-                onChange={(e) => handleSettingChange('twilioAuthToken', e.target.value)}
-                placeholder="••••••••••••••••"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="twilioPhone">Số điện thoại Twilio</Label>
-              <Input
-                id="twilioPhone"
-                value={settings.twilioPhoneNumber}
-                onChange={(e) => handleSettingChange('twilioPhoneNumber', e.target.value)}
-                placeholder="+84..."
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="elevenlabs">ElevenLabs API Key</Label>
-              <Input
-                id="elevenlabs"
-                type={showApiKeys ? "text" : "password"}
-                value={settings.elevenlabsApiKey}
-                onChange={(e) => handleSettingChange('elevenlabsApiKey', e.target.value)}
-                placeholder="••••••••••••••••"
-              />
+              <Label htmlFor="vbeeVoice">Giọng nói vBee</Label>
+              <Select 
+                value={settings.vbeeVoiceId} 
+                onValueChange={(value) => handleSettingChange('vbeeVoiceId', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="vi-female-1">Nữ miền Bắc - Tự nhiên</SelectItem>
+                  <SelectItem value="vi-female-2">Nữ miền Nam - Dễ thương</SelectItem>
+                  <SelectItem value="vi-male-1">Nam miền Bắc - Chuyên nghiệp</SelectItem>
+                  <SelectItem value="vi-male-2">Nam miền Nam - Thân thiện</SelectItem>
+                  <SelectItem value="vi-female-young">Nữ trẻ - Năng động</SelectItem>
+                  <SelectItem value="vi-male-young">Nam trẻ - Năng động</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </CardContent>

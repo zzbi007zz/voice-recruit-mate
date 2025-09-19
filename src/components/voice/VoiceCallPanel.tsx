@@ -120,8 +120,8 @@ export const VoiceCallPanel = () => {
       return;
     }
 
-    if (!settings || !settings.twilioAccountSid || !settings.twilioAuthToken || !settings.elevenlabsApiKey) {
-      toast.error('Vui lòng cấu hình API keys trước khi gọi');
+    if (!settings || !settings.vbeeApiKey) {
+      toast.error('Vui lòng cấu hình vBee API key trước khi gọi');
       return;
     }
 
@@ -145,8 +145,8 @@ export const VoiceCallPanel = () => {
     });
 
     try {
-      // Call the Supabase edge function to initiate Twilio call
-      const { data, error } = await supabase.functions.invoke('initiate-call', {
+      // Call the Supabase edge function to initiate vBee call
+      const { data, error } = await supabase.functions.invoke('initiate-vbee-call', {
         body: {
           candidatePhone: candidate.phone,
           candidateName: candidate.name,
@@ -154,6 +154,8 @@ export const VoiceCallPanel = () => {
           language: settings.language,
           maxDuration: settings.maxCallDuration,
           recordCall: settings.recordCalls,
+          voiceId: settings.vbeeVoiceId,
+          apiKey: settings.vbeeApiKey,
         },
       });
 
@@ -173,7 +175,7 @@ export const VoiceCallPanel = () => {
       }
     } catch (error) {
       console.error('Error initiating call:', error);
-      toast.error('Không thể bắt đầu cuộc gọi. Vui lòng kiểm tra cấu hình Twilio.');
+      toast.error('Không thể bắt đầu cuộc gọi. Vui lòng kiểm tra cấu hình vBee API.');
       setCurrentCall(null);
     }
   };
@@ -260,11 +262,12 @@ export const VoiceCallPanel = () => {
                     />
                   </div>
 
-                  {settings && settings.twilioAccountSid && settings.elevenlabsApiKey ? (
+                  {settings && settings.vbeeApiKey ? (
                     <Alert className="border-success bg-success-light">
                       <Info className="h-4 w-4" />
                       <AlertDescription>
-                        <strong>Sẵn sàng!</strong> Hệ thống gọi điện AI đã được tích hợp với Twilio và ElevenLabs.
+                        <strong>Sẵn sàng!</strong> Hệ thống gọi điện AI đã được tích hợp với vBee.
+                        Giọng nói: {settings.vbeeVoiceId}. 
                         Ngôn ngữ: {settings.language === 'vi' ? 'Tiếng Việt' : 'English'}. 
                         Thời gian tối đa: {settings.maxCallDuration} phút.
                       </AlertDescription>
@@ -273,7 +276,7 @@ export const VoiceCallPanel = () => {
                     <Alert className="border-warning bg-warning-light">
                       <AlertTriangle className="h-4 w-4" />
                       <AlertDescription>
-                        <strong>Cần cấu hình!</strong> Vui lòng chuyển sang tab "Cài đặt" để nhập API keys.
+                        <strong>Cần cấu hình!</strong> Vui lòng chuyển sang tab "Cài đặt" để nhập vBee API key.
                       </AlertDescription>
                     </Alert>
                   )}
@@ -363,15 +366,15 @@ export const VoiceCallPanel = () => {
                     <div className="text-center py-8">
                       <Phone className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                       <p className="text-muted-foreground mb-4">
-                        {!settings || !settings.twilioAccountSid || !settings.elevenlabsApiKey 
-                          ? 'Vui lòng cấu hình API keys trong tab Cài đặt'
+                        {!settings || !settings.vbeeApiKey 
+                          ? 'Vui lòng cấu hình vBee API key trong tab Cài đặt'
                           : 'Sẵn sàng bắt đầu phỏng vấn AI'
                         }
                       </p>
                       <Button 
                         onClick={handleStartCall} 
                         className="gap-2"
-                        disabled={!selectedCandidate || !settings?.twilioAccountSid || !settings?.elevenlabsApiKey}
+                        disabled={!selectedCandidate || !settings?.vbeeApiKey}
                       >
                         <PhoneCall className="h-4 w-4" />
                         Bắt đầu gọi
