@@ -89,6 +89,15 @@ const CVAnalysis = () => {
       const selectedJob = jobs.find(job => job.id === selectedJobId);
       if (!selectedJob) throw new Error('Job not found');
 
+      // Show warning if job has no description
+      if (!selectedJob.description || selectedJob.description.trim() === '') {
+        toast({
+          title: "Notice",
+          description: "This job has no description. Analysis will be based only on the job title.",
+          variant: "default",
+        });
+      }
+
       // Call analysis edge function with fileName (it will download and parse the PDF)
       const { data: analysisData, error: analysisError } = await supabase.functions.invoke('analyze-cv', {
         body: {

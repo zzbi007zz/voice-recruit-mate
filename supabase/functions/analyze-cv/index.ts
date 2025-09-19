@@ -16,12 +16,15 @@ serve(async (req) => {
   try {
     const { fileName, jobDescription, jobTitle } = await req.json();
 
-    if (!fileName || !jobDescription) {
-      return new Response(JSON.stringify({ error: 'File name and job description are required' }), {
+    if (!fileName) {
+      return new Response(JSON.stringify({ error: 'File name is required' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    // Use job title as fallback if description is empty
+    const effectiveJobDescription = jobDescription || `Job Title: ${jobTitle}\n\nNo detailed job description provided. Please analyze the CV against this job title and provide general professional assessment.`;
 
     const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
     if (!geminiApiKey) {
@@ -108,7 +111,7 @@ Use these criteria for match levels:
 JOB TITLE: ${jobTitle}
 
 JOB DESCRIPTION:
-${jobDescription}
+${effectiveJobDescription}
 
 CANDIDATE CV TEXT:
 ${cvText}
