@@ -14,8 +14,9 @@ import { VoiceCallPanel } from '@/components/voice/VoiceCallPanel';
 import { DashboardStats } from '@/components/dashboard/DashboardStats';
 import { JobApplicationManager } from '@/components/applications/JobApplicationManager';
 import { CandidateJobAssigner } from '@/components/applications/CandidateJobAssigner';
-import { Users, Calendar, Phone, Plus, Building2, Briefcase } from 'lucide-react';
+import { Users, Calendar, Phone, Plus, Building2, Briefcase, FileText } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Link } from 'react-router-dom';
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState('candidates');
@@ -108,6 +109,12 @@ const Index = () => {
               <p className="text-muted-foreground">Complete Talent Management System</p>
             </div>
             <div className="flex gap-2">
+              <Link to="/cv-analysis">
+                <Button variant="outline" className="gap-2">
+                  <FileText className="h-4 w-4" />
+                  CV Analysis
+                </Button>
+              </Link>
               <Dialog open={isAddJobOpen} onOpenChange={setIsAddJobOpen}>
                 <DialogTrigger asChild>
                   <Button variant="outline" className="gap-2">
