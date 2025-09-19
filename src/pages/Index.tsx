@@ -12,6 +12,8 @@ import { JobList } from '@/components/jobs/JobList';
 import { InterviewScheduler } from '@/components/interviews/InterviewScheduler';
 import { VoiceCallPanel } from '@/components/voice/VoiceCallPanel';
 import { DashboardStats } from '@/components/dashboard/DashboardStats';
+import { JobApplicationManager } from '@/components/applications/JobApplicationManager';
+import { CandidateJobAssigner } from '@/components/applications/CandidateJobAssigner';
 import { Users, Calendar, Phone, Plus, Building2, Briefcase } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
@@ -27,6 +29,9 @@ const Index = () => {
   const [selectedClientForJob, setSelectedClientForJob] = useState<string | null>(null);
   const [clientsRefresh, setClientsRefresh] = useState(false);
   const [jobsRefresh, setJobsRefresh] = useState(false);
+  const [candidatesRefresh, setCandidatesRefresh] = useState(false);
+  const [showAssignForm, setShowAssignForm] = useState(false);
+  const [assignmentData, setAssignmentData] = useState<{jobId?: string, candidateId?: string}>({});
 
   const handleEditCandidate = (candidate: any) => {
     setEditingCandidate(candidate);
@@ -41,6 +46,12 @@ const Index = () => {
   const handleCandidateFormSuccess = () => {
     setIsAddCandidateOpen(false);
     setEditingCandidate(null);
+    setCandidatesRefresh(prev => !prev);
+  };
+
+  const handleAssignToJob = (candidate: any) => {
+    setAssignmentData({ candidateId: candidate.id });
+    setShowAssignForm(true);
   };
 
   const handleEditClient = (client: any) => {
@@ -60,8 +71,17 @@ const Index = () => {
   };
 
   const handleViewApplications = (jobId: string) => {
-    // TODO: Implement job applications view
-    console.log('View applications for job:', jobId);
+    setActiveTab('applications');
+  };
+
+  const handleAssignmentSelection = (jobId: string, candidateId: string) => {
+    setAssignmentData({ jobId, candidateId });
+    setActiveTab('applications');
+    setShowAssignForm(false);
+  };
+
+  const handleAssignmentComplete = () => {
+    setAssignmentData({});
   };
 
   const handleJobFormSuccess = () => {
@@ -154,7 +174,7 @@ const Index = () => {
 
         {/* Main Navigation Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-8">
-          <TabsList className="grid w-full grid-cols-6 bg-card">
+          <TabsList className="grid w-full grid-cols-7 bg-card">
             <TabsTrigger value="candidates" className="gap-2">
               <Users className="h-4 w-4" />
               Candidates
@@ -166,6 +186,10 @@ const Index = () => {
             <TabsTrigger value="jobs" className="gap-2">
               <Briefcase className="h-4 w-4" />
               Jobs
+            </TabsTrigger>
+            <TabsTrigger value="applications" className="gap-2">
+              <Users className="h-4 w-4" />
+              Applications
             </TabsTrigger>
             <TabsTrigger value="interviews" className="gap-2">
               <Calendar className="h-4 w-4" />
@@ -192,6 +216,8 @@ const Index = () => {
                 <CandidateList 
                   onEditCandidate={handleEditCandidate}
                   onScheduleInterview={handleScheduleInterview}
+                  onAssignToJob={handleAssignToJob}
+                  refresh={candidatesRefresh}
                 />
               </CardContent>
             </Card>
@@ -234,6 +260,14 @@ const Index = () => {
                 />
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="applications" className="mt-6">
+            <JobApplicationManager 
+              selectedJobId={assignmentData.jobId}
+              selectedCandidateId={assignmentData.candidateId}
+              onAssignmentComplete={handleAssignmentComplete}
+            />
           </TabsContent>
 
           <TabsContent value="interviews" className="mt-6">
@@ -281,6 +315,20 @@ const Index = () => {
           </TabsContent>
         </Tabs>
       </main>
+
+      {/* Candidate Job Assigner Dialog */}
+      <Dialog open={showAssignForm} onOpenChange={setShowAssignForm}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Assign Candidate to Job</DialogTitle>
+          </DialogHeader>
+          <CandidateJobAssigner
+            selectedCandidateId={assignmentData.candidateId}
+            onAssignmentComplete={handleAssignmentSelection}
+            onCancel={() => setShowAssignForm(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -17,74 +17,115 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
-import { Search, MoreHorizontal, Edit, Calendar, Phone, Trash2 } from 'lucide-react';
+import { Search, MoreHorizontal, Edit, Calendar, Phone, Trash2, UserPlus } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface Candidate {
   id: string;
   name: string;
   email: string;
-  phone: string;
-  position: string;
-  status: 'new' | 'screening' | 'interviewed' | 'hired' | 'rejected';
-  experience: string;
+  phone: string | null;
+  position: string | null;
+  status: string;
+  experience: string | null;
+  skills: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  user_id: string | null;
   avatar?: string;
 }
 
 interface CandidateListProps {
   onEditCandidate: (candidate: Candidate) => void;
   onScheduleInterview: (candidate: Candidate) => void;
+  onAssignToJob: (candidate: Candidate) => void;
+  refresh?: boolean;
 }
 
-export const CandidateList = ({ onEditCandidate, onScheduleInterview }: CandidateListProps) => {
+export const CandidateList = ({ onEditCandidate, onScheduleInterview, onAssignToJob, refresh }: CandidateListProps) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
-  // Mock data - in real app this would come from your database
-  const [candidates] = useState<Candidate[]>([
-    {
-      id: '1',
-      name: 'Sarah Johnson',
-      email: 'sarah@example.com',
-      phone: '+1 (555) 123-4567',
-      position: 'Frontend Developer',
-      status: 'screening',
-      experience: '3 years',
-    },
-    {
-      id: '2',
-      name: 'Michael Chen',
-      email: 'michael@example.com',
-      phone: '+1 (555) 234-5678',
-      position: 'Backend Developer',
-      status: 'interviewed',
-      experience: '5 years',
-    },
-    {
-      id: '3',
-      name: 'Emily Rodriguez',
-      email: 'emily@example.com',
-      phone: '+1 (555) 345-6789',
-      position: 'UX Designer',
-      status: 'new',
-      experience: '2 years',
-    },
-  ]);
+  const fetchCandidates = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('candidates')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-  const getStatusColor = (status: Candidate['status']) => {
-    const colors = {
-      new: 'bg-primary-light text-primary',
-      screening: 'bg-warning-light text-warning',
-      interviewed: 'bg-accent text-accent-foreground',
-      hired: 'bg-success-light text-success',
-      rejected: 'bg-destructive-light text-destructive',
-    };
-    return colors[status];
+      if (error) throw error;
+      setCandidates(data || []);
+    } catch (error) {
+      console.error('Error fetching candidates:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch candidates',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCandidates();
+  }, [refresh]);
+
+  const handleDelete = async (candidateId: string) => {
+    if (!confirm("Are you sure you want to delete this candidate? This action cannot be undone.")) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('candidates')
+        .delete()
+        .eq('id', candidateId);
+
+      if (error) throw error;
+      
+      toast({ title: 'Candidate deleted successfully' });
+      fetchCandidates();
+    } catch (error) {
+      console.error('Error deleting candidate:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete candidate',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'new':
+        return 'bg-primary/10 text-primary-foreground border-primary/20';
+      case 'screening':
+        return 'bg-warning/10 text-warning-foreground border-warning/20';
+      case 'interviewed':
+        return 'bg-accent/10 text-accent-foreground border-accent/20';
+      case 'hired':
+        return 'bg-success/10 text-success-foreground border-success/20';
+      case 'rejected':
+        return 'bg-destructive/10 text-destructive-foreground border-destructive/20';
+      default:
+        return 'bg-muted/10 text-muted-foreground border-muted/20';
+    }
   };
 
   const filteredCandidates = candidates.filter(candidate =>
     candidate.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     candidate.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    candidate.position.toLowerCase().includes(searchTerm.toLowerCase())
+    (candidate.position && candidate.position.toLowerCase().includes(searchTerm.toLowerCase()))
   );
+
+  if (loading) {
+    return <div className="flex justify-center p-8">Loading candidates...</div>;
+  }
 
   return (
     <div className="space-y-4">
@@ -129,15 +170,15 @@ export const CandidateList = ({ onEditCandidate, onScheduleInterview }: Candidat
                     </div>
                   </div>
                 </TableCell>
-                <TableCell>{candidate.position}</TableCell>
+                <TableCell>{candidate.position || '-'}</TableCell>
                 <TableCell>
                   <Badge className={getStatusColor(candidate.status)}>
                     {candidate.status}
                   </Badge>
                 </TableCell>
-                <TableCell>{candidate.experience}</TableCell>
+                <TableCell>{candidate.experience || '-'}</TableCell>
                 <TableCell className="text-sm text-muted-foreground">
-                  {candidate.phone}
+                  {candidate.phone || '-'}
                 </TableCell>
                 <TableCell>
                   <DropdownMenu>
@@ -151,6 +192,10 @@ export const CandidateList = ({ onEditCandidate, onScheduleInterview }: Candidat
                         <Edit className="mr-2 h-4 w-4" />
                         Edit
                       </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => onAssignToJob(candidate)}>
+                        <UserPlus className="mr-2 h-4 w-4" />
+                        Assign to Job
+                      </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => onScheduleInterview(candidate)}>
                         <Calendar className="mr-2 h-4 w-4" />
                         Schedule Interview
@@ -159,7 +204,10 @@ export const CandidateList = ({ onEditCandidate, onScheduleInterview }: Candidat
                         <Phone className="mr-2 h-4 w-4" />
                         Call Now
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="text-destructive">
+                      <DropdownMenuItem 
+                        onClick={() => handleDelete(candidate.id)}
+                        className="text-destructive"
+                      >
                         <Trash2 className="mr-2 h-4 w-4" />
                         Delete
                       </DropdownMenuItem>

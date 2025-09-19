@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      candidates: {
+        Row: {
+          created_at: string
+          email: string
+          experience: string | null
+          id: string
+          name: string
+          notes: string | null
+          phone: string | null
+          position: string | null
+          skills: string | null
+          status: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          experience?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          phone?: string | null
+          position?: string | null
+          skills?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          experience?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          position?: string | null
+          skills?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       clients: {
         Row: {
           company: string
@@ -93,43 +138,62 @@ export type Database = {
         Row: {
           application_date: string
           candidate_email: string
+          candidate_id: string | null
           candidate_name: string
           candidate_phone: string | null
           created_at: string
+          final_status: string | null
           id: string
           interview_date: string | null
+          interview_feedback: string | null
           job_id: string
           notes: string | null
+          salary_offered: string | null
           status: string
           updated_at: string
         }
         Insert: {
           application_date?: string
           candidate_email: string
+          candidate_id?: string | null
           candidate_name: string
           candidate_phone?: string | null
           created_at?: string
+          final_status?: string | null
           id?: string
           interview_date?: string | null
+          interview_feedback?: string | null
           job_id: string
           notes?: string | null
+          salary_offered?: string | null
           status?: string
           updated_at?: string
         }
         Update: {
           application_date?: string
           candidate_email?: string
+          candidate_id?: string | null
           candidate_name?: string
           candidate_phone?: string | null
           created_at?: string
+          final_status?: string | null
           id?: string
           interview_date?: string | null
+          interview_feedback?: string | null
           job_id?: string
           notes?: string | null
+          salary_offered?: string | null
           status?: string
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "job_applications_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "candidates"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "job_applications_job_id_fkey"
             columns: ["job_id"]

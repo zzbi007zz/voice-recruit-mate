@@ -5,14 +5,28 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface CandidateFormProps {
   onSuccess: () => void;
   initialData?: any;
 }
 
+interface Candidate {
+  id?: string;
+  name: string;
+  email: string;
+  phone: string;
+  position: string;
+  experience: string;
+  skills: string;
+  notes: string;
+  status: string;
+}
+
 export const CandidateForm = ({ onSuccess, initialData }: CandidateFormProps) => {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<Candidate>({
     name: initialData?.name || '',
     email: initialData?.email || '',
     phone: initialData?.phone || '',
@@ -22,15 +36,44 @@ export const CandidateForm = ({ onSuccess, initialData }: CandidateFormProps) =>
     notes: initialData?.notes || '',
     status: initialData?.status || 'new',
   });
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
     
-    // Here you would typically save to your database
-    console.log('Saving candidate:', formData);
-    
-    toast.success(initialData ? 'Candidate updated successfully!' : 'Candidate added successfully!');
-    onSuccess();
+    try {
+      if (initialData?.id) {
+        // Update existing candidate
+        const { error } = await supabase
+          .from('candidates')
+          .update(formData)
+          .eq('id', initialData.id);
+        
+        if (error) throw error;
+        toast({ title: 'Candidate updated successfully!' });
+      } else {
+        // Create new candidate
+        const { error } = await supabase
+          .from('candidates')
+          .insert([formData]);
+        
+        if (error) throw error;
+        toast({ title: 'Candidate added successfully!' });
+      }
+      
+      onSuccess();
+    } catch (error) {
+      console.error('Error saving candidate:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save candidate',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -137,8 +180,8 @@ export const CandidateForm = ({ onSuccess, initialData }: CandidateFormProps) =>
         <Button type="button" variant="outline" onClick={onSuccess}>
           Cancel
         </Button>
-        <Button type="submit">
-          {initialData ? 'Update Candidate' : 'Add Candidate'}
+        <Button type="submit" disabled={loading}>
+          {loading ? 'Saving...' : (initialData ? 'Update Candidate' : 'Add Candidate')}
         </Button>
       </div>
     </form>
