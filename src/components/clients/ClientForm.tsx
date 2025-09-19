@@ -56,9 +56,15 @@ export const ClientForm = ({ client, onSuccess, onCancel }: ClientFormProps) => 
         if (error) throw error;
         toast({ title: "Client updated successfully" });
       } else {
+        // Get current user for user_id
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          throw new Error("You must be logged in to create clients");
+        }
+
         const { error } = await supabase
           .from("clients")
-          .insert([formData]);
+          .insert([{ ...formData, user_id: user.id }]);
 
         if (error) throw error;
         toast({ title: "Client created successfully" });

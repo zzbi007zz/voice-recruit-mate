@@ -28,6 +28,7 @@ export type Database = {
           phone: string | null
           status: string
           updated_at: string
+          user_id: string
         }
         Insert: {
           company: string
@@ -42,6 +43,7 @@ export type Database = {
           phone?: string | null
           status?: string
           updated_at?: string
+          user_id: string
         }
         Update: {
           company?: string
@@ -56,6 +58,7 @@ export type Database = {
           phone?: string | null
           status?: string
           updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -150,6 +153,7 @@ export type Database = {
           status: string
           title: string
           updated_at: string
+          user_id: string
         }
         Insert: {
           client_id: string
@@ -164,6 +168,7 @@ export type Database = {
           status?: string
           title: string
           updated_at?: string
+          user_id: string
         }
         Update: {
           client_id?: string
@@ -178,6 +183,7 @@ export type Database = {
           status?: string
           title?: string
           updated_at?: string
+          user_id?: string
         }
         Relationships: [
           {
