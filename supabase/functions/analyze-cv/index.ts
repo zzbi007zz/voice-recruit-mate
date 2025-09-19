@@ -56,54 +56,110 @@ serve(async (req) => {
 
     console.log('Parsing PDF to text');
 
-    // Convert PDF to text using a simple text extraction
+    // Convert PDF to text using improved extraction
     const arrayBuffer = await fileData.arrayBuffer();
-    const uint8Array = new Uint8Array(arrayBuffer);
     
-    // Enhanced PDF text extraction
-    const pdfText = new TextDecoder().decode(uint8Array);
-    
-    // Extract readable text from PDF using multiple approaches
+    // Try to extract text using proper PDF parsing
     let cvText = '';
     
-    // Method 1: Extract text between parentheses (common in PDFs)
-    const textMatches = pdfText.match(/\(([^)]+)\)/g);
-    if (textMatches) {
-      cvText += textMatches.map(match => match.slice(1, -1)).join(' ');
-    }
-    
-    // Method 2: Extract text using BT/ET markers (PDF text objects)
-    const btEtMatches = pdfText.match(/BT\s+(.*?)\s+ET/gs);
-    if (btEtMatches) {
-      btEtMatches.forEach(match => {
-        const textContent = match.match(/\(([^)]*)\)/g);
-        if (textContent) {
-          cvText += ' ' + textContent.map(t => t.slice(1, -1)).join(' ');
-        }
-      });
-    }
-    
-    // Method 3: Extract text using Tj operators
-    const tjMatches = pdfText.match(/\(([^)]+)\)\s*Tj/g);
-    if (tjMatches) {
-      cvText += ' ' + tjMatches.map(match => match.match(/\(([^)]+)\)/)[1]).join(' ');
-    }
-    
-    // Clean up the extracted text
-    cvText = cvText
-      .replace(/\\[rnt]/g, ' ') // Remove escape characters
-      .replace(/\s+/g, ' ') // Replace multiple spaces with single space
-      .trim();
-    
-    // If still no meaningful text found, provide a detailed fallback
-    if (!cvText || cvText.trim().length < 100) {
-      cvText = `Unable to extract sufficient text from PDF: ${fileName}. 
-      This could be due to:
-      1. The PDF being image-based (scanned document)
-      2. The PDF using unsupported text encoding
-      3. The PDF being encrypted or protected
+    try {
+      // Convert to base64 for OCR processing if needed
+      const base64 = btoa(new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), ''));
       
-      Please ensure the PDF contains readable, selectable text for proper analysis.`;
+      // Use Gemini's vision capabilities to extract text from PDF
+      const visionResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: "Extract all text content from this PDF document. Return ONLY the extracted text, preserving the original structure and formatting. Support both Vietnamese and English text. Do not add any commentary or analysis."
+            }, {
+              inline_data: {
+                mime_type: "application/pdf",
+                data: base64
+              }
+            }]
+          }],
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 4000,
+          }
+        }),
+      });
+
+      if (visionResponse.ok) {
+        const visionData = await visionResponse.json();
+        const extractedText = visionData.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (extractedText && extractedText.length > 50) {
+          cvText = extractedText.trim();
+          console.log('Successfully extracted text using Gemini Vision');
+        }
+      }
+    } catch (visionError) {
+      console.error('Vision extraction failed:', visionError);
+    }
+    
+    // Fallback: Basic text extraction if vision fails
+    if (!cvText || cvText.length < 50) {
+      console.log('Falling back to basic text extraction');
+      
+      try {
+        // Try UTF-8 decoding first
+        const textDecoder = new TextDecoder('utf-8', { ignoreBOM: true, fatal: false });
+        const rawText = textDecoder.decode(arrayBuffer);
+        
+        // Extract text using improved patterns
+        const patterns = [
+          /\(([^)]+)\)/g,                    // Text in parentheses
+          /\/F\d+\s+\d+\s+Tf\s*\(([^)]+)\)/g, // Font definitions with text
+          /BT\s+([^E]+)\s+ET/g,             // Text objects
+          /Tj\s*\[([^\]]+)\]/g,             // Text arrays
+        ];
+        
+        let extractedParts = [];
+        patterns.forEach(pattern => {
+          const matches = rawText.match(pattern);
+          if (matches) {
+            matches.forEach(match => {
+              const cleaned = match
+                .replace(/\(|\)/g, '')
+                .replace(/[\\][rnt]/g, ' ')
+                .replace(/[\\][0-9]{3}/g, ' ')
+                .replace(/\0/g, '')
+                .trim();
+              if (cleaned.length > 2) {
+                extractedParts.push(cleaned);
+              }
+            });
+          }
+        });
+        
+        cvText = extractedParts.join(' ').trim();
+        
+        // Clean up the text
+        cvText = cvText
+          .replace(/\0/g, '') // Remove null characters
+          .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') // Remove control characters
+          .replace(/\s+/g, ' ') // Replace multiple spaces
+          .trim();
+          
+      } catch (decodeError) {
+        console.error('Text decoding failed:', decodeError);
+      }
+    }
+    
+    // Final fallback if no text extracted
+    if (!cvText || cvText.trim().length < 20) {
+      cvText = `Unable to extract readable text from PDF: ${fileName}. 
+This may be because:
+1. The PDF is image-based (scanned document) - consider using OCR
+2. The PDF uses unsupported encoding
+3. The PDF is password protected
+
+For best results, please provide a text-based PDF with selectable content.`;
     }
     
     console.log('Extracted CV text length:', cvText.length);
@@ -119,7 +175,7 @@ serve(async (req) => {
       body: JSON.stringify({
         contents: [{
           parts: [{
-            text: `You are an expert HR professional and recruiter. Analyze the provided CV against the job requirements using a comprehensive scoring matrix.
+            text: `You are an expert HR professional and recruiter. Analyze the provided CV against the job requirements using a comprehensive scoring matrix. The CV may contain Vietnamese and English text - analyze both languages appropriately.
 
 SCORING MATRIX (Total: 100 points):
 1. Technical Skills Match (30 points)
@@ -149,9 +205,10 @@ JOB TITLE: ${jobTitle}
 JOB DESCRIPTION: ${effectiveJobDescription}
 CV TEXT: ${cvText}
 
-Return ONLY a valid JSON object (no markdown formatting, no backticks) with this exact structure:
+IMPORTANT: Return ONLY a valid JSON object (no markdown formatting, no backticks, no additional text). Ensure the cvText field contains clean, readable text without control characters.
+
 {
-  "cvText": "First 500 characters of extracted CV text for verification",
+  "cvText": "First 500 characters of extracted CV text for verification - clean text only",
   "match": "MATCH or PARTIAL_MATCH or NO_MATCH",
   "matchPercentage": 85,
   "scoreBreakdown": {
@@ -212,11 +269,18 @@ Match criteria: MATCH (80-100%), PARTIAL_MATCH (50-79%), NO_MATCH (0-49%)`
         cleanContent = cleanContent.replace(/```\s*/, '').replace(/```\s*$/, '');
       }
       
+      // Remove any control characters that might break JSON parsing
+      cleanContent = cleanContent.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+      
       // Parse the cleaned JSON
       analysis = JSON.parse(cleanContent);
       
       // Validate required fields and add defaults if missing
-      if (!analysis.cvText) analysis.cvText = cvText.substring(0, 500);
+      if (!analysis.cvText) {
+        // Clean the CV text for display - remove control characters
+        const cleanCvText = cvText.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '').substring(0, 500);
+        analysis.cvText = cleanCvText;
+      }
       if (!analysis.scoreBreakdown) {
         analysis.scoreBreakdown = {
           technicalSkills: Math.floor(analysis.matchPercentage * 0.3),
@@ -232,9 +296,10 @@ Match criteria: MATCH (80-100%), PARTIAL_MATCH (50-79%), NO_MATCH (0-49%)`
       console.error('Failed to parse AI response as JSON:', parseError);
       console.error('Raw content that failed to parse:', analysisContent);
       
-      // Enhanced fallback response with actual CV text
+      // Enhanced fallback response with cleaned CV text
+      const cleanCvText = cvText.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '').substring(0, 500);
       analysis = {
-        cvText: cvText.substring(0, 500),
+        cvText: cleanCvText,
         match: "PARTIAL_MATCH",
         matchPercentage: 50,
         scoreBreakdown: {
@@ -245,12 +310,12 @@ Match criteria: MATCH (80-100%), PARTIAL_MATCH (50-79%), NO_MATCH (0-49%)`
           additional: 5,
           total: 50
         },
-        summary: "Analysis completed but AI response format was invalid. The CV was processed but detailed scoring could not be completed. Please try again.",
-        strengths: ["CV successfully uploaded and processed"],
-        gaps: ["Unable to complete detailed analysis due to parsing error"],
-        recommendations: ["Please re-upload the CV and try analysis again"],
+        summary: "CV analysis completed with limitations. The text was extracted but AI parsing encountered issues. Manual review recommended.",
+        strengths: ["CV successfully uploaded and processed", "Basic content extraction completed"],
+        gaps: ["Detailed analysis limited due to parsing complexity", "May require manual review for accuracy"],
+        recommendations: ["Consider re-uploading CV in a different format", "Ensure CV contains clear, selectable text", "Manual review by HR team recommended"],
         keySkillsMatch: { technical: [], soft: [], experience: [] },
-        riskFactors: ["Analysis incomplete due to technical issue"]
+        riskFactors: ["Automated analysis incomplete - manual verification needed"]
       };
     }
 
