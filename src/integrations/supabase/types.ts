@@ -28,7 +28,7 @@ export type Database = {
           phone: string | null
           status: string
           updated_at: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           company: string
@@ -43,7 +43,7 @@ export type Database = {
           phone?: string | null
           status?: string
           updated_at?: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           company?: string
@@ -58,7 +58,7 @@ export type Database = {
           phone?: string | null
           status?: string
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -153,7 +153,7 @@ export type Database = {
           status: string
           title: string
           updated_at: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           client_id: string
@@ -168,7 +168,7 @@ export type Database = {
           status?: string
           title: string
           updated_at?: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           client_id?: string
@@ -183,7 +183,7 @@ export type Database = {
           status?: string
           title?: string
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {

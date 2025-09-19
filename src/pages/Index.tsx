@@ -7,20 +7,26 @@ import { CandidateForm } from '@/components/candidates/CandidateForm';
 import { ClientList } from '@/components/clients/ClientList';
 import { ClientForm } from '@/components/clients/ClientForm';
 import { ClientStats } from '@/components/clients/ClientStats';
+import { JobForm } from '@/components/jobs/JobForm';
+import { JobList } from '@/components/jobs/JobList';
 import { InterviewScheduler } from '@/components/interviews/InterviewScheduler';
 import { VoiceCallPanel } from '@/components/voice/VoiceCallPanel';
 import { DashboardStats } from '@/components/dashboard/DashboardStats';
-import { Users, Calendar, Phone, Plus, Building2 } from 'lucide-react';
+import { Users, Calendar, Phone, Plus, Building2, Briefcase } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState('candidates');
   const [isAddCandidateOpen, setIsAddCandidateOpen] = useState(false);
   const [isAddClientOpen, setIsAddClientOpen] = useState(false);
+  const [isAddJobOpen, setIsAddJobOpen] = useState(false);
   const [selectedCandidate, setSelectedCandidate] = useState(null);
   const [editingCandidate, setEditingCandidate] = useState(null);
   const [editingClient, setEditingClient] = useState(null);
+  const [editingJob, setEditingJob] = useState(null);
+  const [selectedClientForJob, setSelectedClientForJob] = useState<string | null>(null);
   const [clientsRefresh, setClientsRefresh] = useState(false);
+  const [jobsRefresh, setJobsRefresh] = useState(false);
 
   const handleEditCandidate = (candidate: any) => {
     setEditingCandidate(candidate);
@@ -43,8 +49,26 @@ const Index = () => {
   };
 
   const handleCreateJob = (clientId: string) => {
-    // TODO: Implement job creation functionality
-    console.log('Create job for client:', clientId);
+    setSelectedClientForJob(clientId);
+    setIsAddJobOpen(true);
+  };
+
+  const handleEditJob = (job: any) => {
+    setEditingJob(job);
+    setSelectedClientForJob(null);
+    setIsAddJobOpen(true);
+  };
+
+  const handleViewApplications = (jobId: string) => {
+    // TODO: Implement job applications view
+    console.log('View applications for job:', jobId);
+  };
+
+  const handleJobFormSuccess = () => {
+    setIsAddJobOpen(false);
+    setEditingJob(null);
+    setSelectedClientForJob(null);
+    setJobsRefresh(prev => !prev);
   };
 
   const handleClientFormSuccess = () => {
@@ -64,6 +88,25 @@ const Index = () => {
               <p className="text-muted-foreground">Complete Talent Management System</p>
             </div>
             <div className="flex gap-2">
+              <Dialog open={isAddJobOpen} onOpenChange={setIsAddJobOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="gap-2">
+                    <Briefcase className="h-4 w-4" />
+                    Add Job
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>{editingJob ? 'Edit Job' : 'Create New Job'}</DialogTitle>
+                  </DialogHeader>
+                  <JobForm 
+                    job={editingJob}
+                    clientId={selectedClientForJob}
+                    onSuccess={handleJobFormSuccess}
+                    onCancel={() => setIsAddJobOpen(false)}
+                  />
+                </DialogContent>
+              </Dialog>
               <Dialog open={isAddClientOpen} onOpenChange={setIsAddClientOpen}>
                 <DialogTrigger asChild>
                   <Button variant="outline" className="gap-2">
@@ -111,7 +154,7 @@ const Index = () => {
 
         {/* Main Navigation Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-8">
-          <TabsList className="grid w-full grid-cols-5 bg-card">
+          <TabsList className="grid w-full grid-cols-6 bg-card">
             <TabsTrigger value="candidates" className="gap-2">
               <Users className="h-4 w-4" />
               Candidates
@@ -119,6 +162,10 @@ const Index = () => {
             <TabsTrigger value="clients" className="gap-2">
               <Building2 className="h-4 w-4" />
               Clients
+            </TabsTrigger>
+            <TabsTrigger value="jobs" className="gap-2">
+              <Briefcase className="h-4 w-4" />
+              Jobs
             </TabsTrigger>
             <TabsTrigger value="interviews" className="gap-2">
               <Calendar className="h-4 w-4" />
@@ -169,6 +216,24 @@ const Index = () => {
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+
+          <TabsContent value="jobs" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Job Management</CardTitle>
+                <CardDescription>
+                  Manage job postings and track applications
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <JobList 
+                  onEditJob={handleEditJob}
+                  onViewApplications={handleViewApplications}
+                  refresh={jobsRefresh}
+                />
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="interviews" className="mt-6">
