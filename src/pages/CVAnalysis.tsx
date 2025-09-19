@@ -10,12 +10,21 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
-import { Upload, FileText, CheckCircle, XCircle, AlertCircle, ArrowLeft } from 'lucide-react';
+import { Upload, FileText, CheckCircle, XCircle, AlertCircle, ArrowLeft, Lightbulb, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 interface CVAnalysisResult {
+  cvText: string;
   match: 'MATCH' | 'PARTIAL_MATCH' | 'NO_MATCH';
   matchPercentage: number;
+  scoreBreakdown: {
+    technicalSkills: number;
+    experience: number;
+    education: number;
+    softSkills: number;
+    additional: number;
+    total: number;
+  };
   summary: string;
   strengths: string[];
   gaps: string[];
@@ -245,15 +254,29 @@ const CVAnalysis = () => {
               </CardHeader>
               <CardContent className="space-y-6">
                 
-                {/* Match Score */}
+                {/* CV Text Preview */}
+                <Card className="bg-muted/50">
+                  <CardHeader>
+                    <CardTitle className="text-lg">Extracted CV Content</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="bg-background p-4 rounded-lg max-h-48 overflow-y-auto border">
+                      <p className="text-sm font-mono whitespace-pre-wrap text-muted-foreground">
+                        {analysisResult.cvText}...
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Overall Match Score */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Match Score</span>
-                    <Badge variant="secondary">{analysisResult.matchPercentage}%</Badge>
+                    <span className="text-lg font-semibold">Overall Match Score</span>
+                    <Badge variant="secondary" className="text-lg px-3 py-1">{analysisResult.matchPercentage}%</Badge>
                   </div>
                   <Progress 
                     value={analysisResult.matchPercentage} 
-                    className="h-2"
+                    className="h-3"
                     style={{ '--progress-foreground': getMatchColor(analysisResult.match) } as any}
                   />
                   <p className="text-sm text-muted-foreground">{analysisResult.summary}</p>
@@ -261,69 +284,133 @@ const CVAnalysis = () => {
 
                 <Separator />
 
-                {/* Strengths */}
-                <div className="space-y-3">
-                  <h3 className="font-semibold text-green-700 dark:text-green-400">Strengths</h3>
-                  <ul className="space-y-1">
-                    {analysisResult.strengths.map((strength, index) => (
-                      <li key={index} className="flex items-start gap-2 text-sm">
-                        <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
-                        {strength}
-                      </li>
-                    ))}
-                  </ul>
+                {/* Detailed Score Breakdown */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Score Breakdown</h3>
+                  <div className="grid gap-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium">Technical Skills (30 points max)</span>
+                      <span className="text-sm font-semibold">{analysisResult.scoreBreakdown.technicalSkills}/30</span>
+                    </div>
+                    <Progress value={(analysisResult.scoreBreakdown.technicalSkills / 30) * 100} className="h-2" />
+                    
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium">Experience (25 points max)</span>
+                      <span className="text-sm font-semibold">{analysisResult.scoreBreakdown.experience}/25</span>
+                    </div>
+                    <Progress value={(analysisResult.scoreBreakdown.experience / 25) * 100} className="h-2" />
+                    
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium">Education (15 points max)</span>
+                      <span className="text-sm font-semibold">{analysisResult.scoreBreakdown.education}/15</span>
+                    </div>
+                    <Progress value={(analysisResult.scoreBreakdown.education / 15) * 100} className="h-2" />
+                    
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium">Soft Skills (20 points max)</span>
+                      <span className="text-sm font-semibold">{analysisResult.scoreBreakdown.softSkills}/20</span>
+                    </div>
+                    <Progress value={(analysisResult.scoreBreakdown.softSkills / 20) * 100} className="h-2" />
+                    
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium">Additional Qualifications (10 points max)</span>
+                      <span className="text-sm font-semibold">{analysisResult.scoreBreakdown.additional}/10</span>
+                    </div>
+                    <Progress value={(analysisResult.scoreBreakdown.additional / 10) * 100} className="h-2" />
+                    
+                    <Separator />
+                    <div className="flex justify-between items-center font-semibold text-lg">
+                      <span>Total Score</span>
+                      <span>{analysisResult.scoreBreakdown.total}/100</span>
+                    </div>
+                  </div>
                 </div>
 
                 <Separator />
 
-                {/* Gaps */}
-                {analysisResult.gaps.length > 0 && (
-                  <>
-                    <div className="space-y-3">
-                      <h3 className="font-semibold text-red-700 dark:text-red-400">Areas for Improvement</h3>
-                      <ul className="space-y-1">
-                        {analysisResult.gaps.map((gap, index) => (
-                          <li key={index} className="flex items-start gap-2 text-sm">
-                            <XCircle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
-                            {gap}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                    <Separator />
-                  </>
-                )}
+                {/* Strengths and Gaps in Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <h3 className="font-semibold text-green-700 dark:text-green-400 flex items-center gap-2">
+                      <CheckCircle2 className="h-5 w-5" />
+                      Strengths
+                    </h3>
+                    <ul className="space-y-2">
+                      {analysisResult.strengths.map((strength, index) => (
+                        <li key={index} className="flex items-start gap-2 text-sm">
+                          <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                          {strength}
+                        </li>
+                      ))}
+                      {analysisResult.strengths.length === 0 && (
+                        <li className="text-sm text-muted-foreground">No specific strengths identified</li>
+                      )}
+                    </ul>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h3 className="font-semibold text-red-700 dark:text-red-400 flex items-center gap-2">
+                      <XCircle className="h-5 w-5" />
+                      Areas for Improvement
+                    </h3>
+                    <ul className="space-y-2">
+                      {analysisResult.gaps.map((gap, index) => (
+                        <li key={index} className="flex items-start gap-2 text-sm">
+                          <XCircle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
+                          {gap}
+                        </li>
+                      ))}
+                      {analysisResult.gaps.length === 0 && (
+                        <li className="text-sm text-muted-foreground">No specific gaps identified</li>
+                      )}
+                    </ul>
+                  </div>
+                </div>
+
+                <Separator />
 
                 {/* Key Skills Match */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <h4 className="font-medium">Technical Skills</h4>
-                    <div className="flex flex-wrap gap-1">
-                      {analysisResult.keySkillsMatch.technical.map((skill, index) => (
-                        <Badge key={index} variant="secondary" className="text-xs">
-                          {skill}
-                        </Badge>
-                      ))}
+                <div className="space-y-4">
+                  <h3 className="font-semibold">Skill Matching</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <h4 className="font-medium">Technical Skills</h4>
+                      <div className="flex flex-wrap gap-1">
+                        {analysisResult.keySkillsMatch.technical.map((skill, index) => (
+                          <Badge key={index} variant="secondary" className="text-xs">
+                            {skill}
+                          </Badge>
+                        ))}
+                        {analysisResult.keySkillsMatch.technical.length === 0 && (
+                          <span className="text-sm text-muted-foreground">No technical skills identified</span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  <div className="space-y-2">
-                    <h4 className="font-medium">Soft Skills</h4>
-                    <div className="flex flex-wrap gap-1">
-                      {analysisResult.keySkillsMatch.soft.map((skill, index) => (
-                        <Badge key={index} variant="secondary" className="text-xs">
-                          {skill}
-                        </Badge>
-                      ))}
+                    <div className="space-y-2">
+                      <h4 className="font-medium">Soft Skills</h4>
+                      <div className="flex flex-wrap gap-1">
+                        {analysisResult.keySkillsMatch.soft.map((skill, index) => (
+                          <Badge key={index} variant="secondary" className="text-xs">
+                            {skill}
+                          </Badge>
+                        ))}
+                        {analysisResult.keySkillsMatch.soft.length === 0 && (
+                          <span className="text-sm text-muted-foreground">No soft skills identified</span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  <div className="space-y-2">
-                    <h4 className="font-medium">Experience</h4>
-                    <div className="flex flex-wrap gap-1">
-                      {analysisResult.keySkillsMatch.experience.map((exp, index) => (
-                        <Badge key={index} variant="secondary" className="text-xs">
-                          {exp}
-                        </Badge>
-                      ))}
+                    <div className="space-y-2">
+                      <h4 className="font-medium">Experience</h4>
+                      <div className="flex flex-wrap gap-1">
+                        {analysisResult.keySkillsMatch.experience.map((exp, index) => (
+                          <Badge key={index} variant="secondary" className="text-xs">
+                            {exp}
+                          </Badge>
+                        ))}
+                        {analysisResult.keySkillsMatch.experience.length === 0 && (
+                          <span className="text-sm text-muted-foreground">No relevant experience identified</span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -333,12 +420,36 @@ const CVAnalysis = () => {
                   <>
                     <Separator />
                     <div className="space-y-3">
-                      <h3 className="font-semibold text-blue-700 dark:text-blue-400">Recommendations</h3>
-                      <ul className="space-y-1">
+                      <h3 className="font-semibold text-blue-700 dark:text-blue-400 flex items-center gap-2">
+                        <Lightbulb className="h-5 w-5" />
+                        Recommendations
+                      </h3>
+                      <ul className="space-y-2">
                         {analysisResult.recommendations.map((rec, index) => (
                           <li key={index} className="flex items-start gap-2 text-sm">
-                            <AlertCircle className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                            <Lightbulb className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
                             {rec}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </>
+                )}
+
+                {/* Risk Factors */}
+                {analysisResult.riskFactors.length > 0 && (
+                  <>
+                    <Separator />
+                    <div className="space-y-3">
+                      <h3 className="font-semibold text-orange-700 dark:text-orange-400 flex items-center gap-2">
+                        <AlertTriangle className="h-5 w-5" />
+                        Risk Factors
+                      </h3>
+                      <ul className="space-y-2">
+                        {analysisResult.riskFactors.map((risk, index) => (
+                          <li key={index} className="flex items-start gap-2 text-sm">
+                            <AlertTriangle className="h-4 w-4 text-orange-600 mt-0.5 flex-shrink-0" />
+                            {risk}
                           </li>
                         ))}
                       </ul>

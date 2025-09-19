@@ -60,20 +60,54 @@ serve(async (req) => {
     const arrayBuffer = await fileData.arrayBuffer();
     const uint8Array = new Uint8Array(arrayBuffer);
     
-    // Simple PDF text extraction (this is a basic approach)
+    // Enhanced PDF text extraction
     const pdfText = new TextDecoder().decode(uint8Array);
     
-    // Extract readable text from PDF (basic regex approach)
+    // Extract readable text from PDF using multiple approaches
     let cvText = '';
+    
+    // Method 1: Extract text between parentheses (common in PDFs)
     const textMatches = pdfText.match(/\(([^)]+)\)/g);
     if (textMatches) {
-      cvText = textMatches.map(match => match.slice(1, -1)).join(' ');
+      cvText += textMatches.map(match => match.slice(1, -1)).join(' ');
     }
     
-    // If no text found, use a fallback
-    if (!cvText || cvText.trim().length < 50) {
-      cvText = "Unable to extract text from PDF. Please ensure the PDF contains readable text and is not image-based.";
+    // Method 2: Extract text using BT/ET markers (PDF text objects)
+    const btEtMatches = pdfText.match(/BT\s+(.*?)\s+ET/gs);
+    if (btEtMatches) {
+      btEtMatches.forEach(match => {
+        const textContent = match.match(/\(([^)]*)\)/g);
+        if (textContent) {
+          cvText += ' ' + textContent.map(t => t.slice(1, -1)).join(' ');
+        }
+      });
     }
+    
+    // Method 3: Extract text using Tj operators
+    const tjMatches = pdfText.match(/\(([^)]+)\)\s*Tj/g);
+    if (tjMatches) {
+      cvText += ' ' + tjMatches.map(match => match.match(/\(([^)]+)\)/)[1]).join(' ');
+    }
+    
+    // Clean up the extracted text
+    cvText = cvText
+      .replace(/\\[rnt]/g, ' ') // Remove escape characters
+      .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+      .trim();
+    
+    // If still no meaningful text found, provide a detailed fallback
+    if (!cvText || cvText.trim().length < 100) {
+      cvText = `Unable to extract sufficient text from PDF: ${fileName}. 
+      This could be due to:
+      1. The PDF being image-based (scanned document)
+      2. The PDF using unsupported text encoding
+      3. The PDF being encrypted or protected
+      
+      Please ensure the PDF contains readable, selectable text for proper analysis.`;
+    }
+    
+    console.log('Extracted CV text length:', cvText.length);
+    console.log('CV text preview:', cvText.substring(0, 200));
 
     console.log('Analyzing CV against job description using Gemini');
 
@@ -85,38 +119,62 @@ serve(async (req) => {
       body: JSON.stringify({
         contents: [{
           parts: [{
-            text: `You are an expert HR professional and recruiter. Your job is to analyze candidate CVs against job descriptions and provide detailed matching assessments.
+            text: `You are an expert HR professional and recruiter. Analyze the provided CV against the job requirements using a comprehensive scoring matrix.
 
-Analyze the provided CV against the job description and return a JSON response with the following structure:
-{
-  "match": "MATCH" | "PARTIAL_MATCH" | "NO_MATCH",
-  "matchPercentage": number (0-100),
-  "summary": "Brief overall assessment (2-3 sentences)",  
-  "strengths": ["Array of matching qualifications and skills"],
-  "gaps": ["Array of missing requirements or skills"],
-  "recommendations": ["Array of suggestions for improvement"],
-  "keySkillsMatch": {
-    "technical": ["Matched technical skills"],
-    "soft": ["Matched soft skills"], 
-    "experience": ["Relevant experience matches"]
-  },
-  "riskFactors": ["Potential concerns or red flags"]
-}
+SCORING MATRIX (Total: 100 points):
+1. Technical Skills Match (30 points)
+   - Required technical skills: 20 points
+   - Preferred technical skills: 10 points
 
-Use these criteria for match levels:
-- MATCH: 80%+ match, strong fit for the role
-- PARTIAL_MATCH: 50-79% match, some fit but has gaps  
-- NO_MATCH: <50% match, poor fit for the role
+2. Experience Level (25 points)
+   - Years of experience: 15 points
+   - Relevant industry experience: 10 points
+
+3. Education & Certifications (15 points)
+   - Required education: 10 points
+   - Relevant certifications: 5 points
+
+4. Soft Skills & Cultural Fit (20 points)
+   - Communication skills: 5 points
+   - Leadership/teamwork: 5 points
+   - Problem-solving: 5 points
+   - Adaptability: 5 points
+
+5. Additional Qualifications (10 points)
+   - Portfolio/projects: 5 points
+   - Languages: 2 points
+   - Awards/achievements: 3 points
 
 JOB TITLE: ${jobTitle}
+JOB DESCRIPTION: ${effectiveJobDescription}
+CV TEXT: ${cvText}
 
-JOB DESCRIPTION:
-${effectiveJobDescription}
+Return ONLY a valid JSON object (no markdown formatting, no backticks) with this exact structure:
+{
+  "cvText": "First 500 characters of extracted CV text for verification",
+  "match": "MATCH or PARTIAL_MATCH or NO_MATCH",
+  "matchPercentage": 85,
+  "scoreBreakdown": {
+    "technicalSkills": 25,
+    "experience": 20,
+    "education": 12,
+    "softSkills": 18,
+    "additional": 8,
+    "total": 83
+  },
+  "summary": "Brief 2-3 sentence overall assessment",
+  "strengths": ["Specific matching qualifications", "Relevant skills found"],
+  "gaps": ["Missing requirements", "Areas for improvement"],
+  "recommendations": ["Specific suggestions for candidate"],
+  "keySkillsMatch": {
+    "technical": ["React", "TypeScript", "JavaScript"],
+    "soft": ["Communication", "Problem-solving"],
+    "experience": ["3+ years frontend", "Team collaboration"]
+  },
+  "riskFactors": ["Any concerns or potential issues"]
+}
 
-CANDIDATE CV TEXT:
-${cvText}
-
-Please provide a comprehensive analysis in the specified JSON format. Return ONLY the JSON response, no other text.`
+Match criteria: MATCH (80-100%), PARTIAL_MATCH (50-79%), NO_MATCH (0-49%)`
           }]
         }],
         generationConfig: {
@@ -138,23 +196,61 @@ Please provide a comprehensive analysis in the specified JSON format. Return ONL
     const data = await response.json();
     const analysisContent = data.candidates[0].content.parts[0].text;
 
+    console.log('Raw Gemini response:', analysisContent);
     console.log('Analysis completed successfully');
 
     let analysis;
     try {
-      analysis = JSON.parse(analysisContent);
+      // Clean the response to ensure it's valid JSON
+      let cleanContent = analysisContent.trim();
+      
+      // Remove markdown code blocks if present
+      if (cleanContent.startsWith('```json')) {
+        cleanContent = cleanContent.replace(/```json\s*/, '').replace(/```\s*$/, '');
+      }
+      if (cleanContent.startsWith('```')) {
+        cleanContent = cleanContent.replace(/```\s*/, '').replace(/```\s*$/, '');
+      }
+      
+      // Parse the cleaned JSON
+      analysis = JSON.parse(cleanContent);
+      
+      // Validate required fields and add defaults if missing
+      if (!analysis.cvText) analysis.cvText = cvText.substring(0, 500);
+      if (!analysis.scoreBreakdown) {
+        analysis.scoreBreakdown = {
+          technicalSkills: Math.floor(analysis.matchPercentage * 0.3),
+          experience: Math.floor(analysis.matchPercentage * 0.25),
+          education: Math.floor(analysis.matchPercentage * 0.15),
+          softSkills: Math.floor(analysis.matchPercentage * 0.2),
+          additional: Math.floor(analysis.matchPercentage * 0.1),
+          total: analysis.matchPercentage
+        };
+      }
+      
     } catch (parseError) {
       console.error('Failed to parse AI response as JSON:', parseError);
-      // Fallback to a basic response
+      console.error('Raw content that failed to parse:', analysisContent);
+      
+      // Enhanced fallback response with actual CV text
       analysis = {
+        cvText: cvText.substring(0, 500),
         match: "PARTIAL_MATCH",
         matchPercentage: 50,
-        summary: "Analysis completed but response format was invalid. Please try again.",
-        strengths: [],
-        gaps: [],
-        recommendations: [],
+        scoreBreakdown: {
+          technicalSkills: 15,
+          experience: 12,
+          education: 8,
+          softSkills: 10,
+          additional: 5,
+          total: 50
+        },
+        summary: "Analysis completed but AI response format was invalid. The CV was processed but detailed scoring could not be completed. Please try again.",
+        strengths: ["CV successfully uploaded and processed"],
+        gaps: ["Unable to complete detailed analysis due to parsing error"],
+        recommendations: ["Please re-upload the CV and try analysis again"],
         keySkillsMatch: { technical: [], soft: [], experience: [] },
-        riskFactors: []
+        riskFactors: ["Analysis incomplete due to technical issue"]
       };
     }
 
