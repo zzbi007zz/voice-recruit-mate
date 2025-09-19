@@ -85,22 +85,14 @@ const CVAnalysis = () => {
 
       if (uploadError) throw uploadError;
 
-      // Parse PDF using document parser
-      const formData = new FormData();
-      formData.append('file', selectedFile);
-
-      // Note: This would need a document parsing service or library
-      // For now, we'll simulate CV text extraction
-      const cvText = "Extracted CV text would go here - this is a demo placeholder";
-
       // Get job details
       const selectedJob = jobs.find(job => job.id === selectedJobId);
       if (!selectedJob) throw new Error('Job not found');
 
-      // Call analysis edge function
+      // Call analysis edge function with fileName (it will download and parse the PDF)
       const { data: analysisData, error: analysisError } = await supabase.functions.invoke('analyze-cv', {
         body: {
-          cvText,
+          fileName,
           jobDescription: selectedJob.description,
           jobTitle: selectedJob.title
         }
