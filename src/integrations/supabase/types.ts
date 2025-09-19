@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      clients: {
+        Row: {
+          company: string
+          contact_person: string | null
+          created_at: string
+          email: string
+          id: string
+          industry: string | null
+          location: string | null
+          name: string
+          notes: string | null
+          phone: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          company: string
+          contact_person?: string | null
+          created_at?: string
+          email: string
+          id?: string
+          industry?: string | null
+          location?: string | null
+          name: string
+          notes?: string | null
+          phone?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          company?: string
+          contact_person?: string | null
+          created_at?: string
+          email?: string
+          id?: string
+          industry?: string | null
+          location?: string | null
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       demo: {
         Row: {
           id: number
@@ -40,6 +85,109 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      job_applications: {
+        Row: {
+          application_date: string
+          candidate_email: string
+          candidate_name: string
+          candidate_phone: string | null
+          created_at: string
+          id: string
+          interview_date: string | null
+          job_id: string
+          notes: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          application_date?: string
+          candidate_email: string
+          candidate_name: string
+          candidate_phone?: string | null
+          created_at?: string
+          id?: string
+          interview_date?: string | null
+          job_id: string
+          notes?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          application_date?: string
+          candidate_email?: string
+          candidate_name?: string
+          candidate_phone?: string | null
+          created_at?: string
+          id?: string
+          interview_date?: string | null
+          job_id?: string
+          notes?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_applications_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      jobs: {
+        Row: {
+          client_id: string
+          created_at: string
+          description: string | null
+          id: string
+          job_type: string | null
+          location: string | null
+          priority: string | null
+          requirements: string[] | null
+          salary_range: string | null
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          job_type?: string | null
+          location?: string | null
+          priority?: string | null
+          requirements?: string[] | null
+          salary_range?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          job_type?: string | null
+          location?: string | null
+          priority?: string | null
+          requirements?: string[] | null
+          salary_range?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "jobs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
