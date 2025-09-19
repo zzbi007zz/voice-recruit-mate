@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { candidatePhone, candidateName, aiPrompt } = await req.json();
+    const { candidatePhone, candidateName, aiPrompt, language = 'vi', maxDuration = 30, recordCall = true } = await req.json();
 
     if (!candidatePhone || !candidateName) {
       throw new Error('Candidate phone and name are required');
@@ -31,9 +31,13 @@ serve(async (req) => {
     
     const formData = new URLSearchParams();
     formData.append('To', candidatePhone);
-    formData.append('From', '+15551234567'); // Replace with your Twilio phone number
-    formData.append('Url', `https://ubjemrvwfyglppfmxoep.supabase.co/functions/v1/handle-call?name=${encodeURIComponent(candidateName)}&prompt=${encodeURIComponent(aiPrompt || 'Conduct a professional interview')}`);
+    formData.append('From', '+15551234567'); // Replace with your configured Twilio phone number
+    formData.append('Url', `https://ubjemrvwfyglppfmxoep.supabase.co/functions/v1/handle-call?name=${encodeURIComponent(candidateName)}&prompt=${encodeURIComponent(aiPrompt)}&language=${language}&maxDuration=${maxDuration}`);
     formData.append('Method', 'POST');
+    
+    if (recordCall) {
+      formData.append('Record', 'true');
+    }
 
     const response = await fetch(twilioUrl, {
       method: 'POST',

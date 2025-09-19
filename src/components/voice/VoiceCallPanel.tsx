@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Phone, 
   PhoneCall, 
@@ -16,10 +17,13 @@ import {
   Play, 
   Square, 
   Info,
-  Settings
+  Settings,
+  Clock,
+  AlertTriangle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { VoiceSettings, type VoiceSettings as VoiceSettingsType } from './VoiceSettings';
 
 interface CallSession {
   id: string;
@@ -29,6 +33,8 @@ interface CallSession {
   status: 'idle' | 'connecting' | 'active' | 'completed' | 'error';
   transcript?: string;
   aiInsights?: string;
+  maxDuration?: number;
+  startTime?: Date;
 }
 
 export const VoiceCallPanel = () => {
@@ -36,45 +42,96 @@ export const VoiceCallPanel = () => {
   const [isMuted, setIsMuted] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [selectedCandidate, setSelectedCandidate] = useState('');
-  const [aiPrompt, setAiPrompt] = useState('Conduct a professional interview focusing on technical skills and cultural fit.');
+  const [aiPrompt, setAiPrompt] = useState('Thực hiện cuộc phỏng vấn chuyên nghiệp, tập trung vào kỹ năng kỹ thuật và sự phù hợp văn hóa. Hãy hỏi về kinh nghiệm làm việc, dự án đã thực hiện và mục tiêu nghề nghiệp.');
+  const [settings, setSettings] = useState<VoiceSettingsType | null>(null);
+  const [callTimer, setCallTimer] = useState<NodeJS.Timeout | null>(null);
+  const [timeRemaining, setTimeRemaining] = useState<number>(0);
 
-  // Mock candidates for voice calling
+  // Vietnamese candidates for demo
   const candidates = [
-    { id: '1', name: 'Sarah Johnson', phone: '+1 (555) 123-4567', position: 'Frontend Developer' },
-    { id: '2', name: 'Michael Chen', phone: '+1 (555) 234-5678', position: 'Backend Developer' },
-    { id: '3', name: 'Emily Rodriguez', phone: '+1 (555) 345-6789', position: 'UX Designer' },
+    { id: '1', name: 'Nguyễn Văn An', phone: '+84 901 234 567', position: 'Frontend Developer' },
+    { id: '2', name: 'Trần Thị Minh', phone: '+84 902 345 678', position: 'Backend Developer' },
+    { id: '3', name: 'Lê Hoàng Nam', phone: '+84 903 456 789', position: 'Full Stack Developer' },
+    { id: '4', name: 'Phạm Thị Lan', phone: '+84 904 567 890', position: 'UX/UI Designer' },
   ];
 
-  // Mock call history
+  // Vietnamese call history
   const [callHistory] = useState<CallSession[]>([
     {
       id: '1',
-      candidateName: 'Sarah Johnson',
-      candidatePhone: '+1 (555) 123-4567',
+      candidateName: 'Nguyễn Văn An',
+      candidatePhone: '+84 901 234 567',
       duration: 1847, // seconds
       status: 'completed',
-      transcript: 'Initial screening call discussing React experience and project portfolio...',
-      aiInsights: 'Strong technical background, good communication skills, seems enthusiastic about the role.',
+      transcript: 'Cuộc gọi sàng lọc ban đầu thảo luận về kinh nghiệm React và portfolio dự án...',
+      aiInsights: 'Nền tảng kỹ thuật vững chắc, kỹ năng giao tiếp tốt, có vẻ nhiệt tình với vị trí này.',
     },
     {
       id: '2',
-      candidateName: 'Michael Chen',
-      candidatePhone: '+1 (555) 234-5678',
+      candidateName: 'Trần Thị Minh',
+      candidatePhone: '+84 902 345 678',
       duration: 2156,
       status: 'completed',
-      transcript: 'Technical interview covering Node.js, databases, and system architecture...',
-      aiInsights: 'Excellent technical knowledge, experienced with scalable systems, good problem-solving approach.',
+      transcript: 'Phỏng vấn kỹ thuật về Node.js, cơ sở dữ liệu và kiến trúc hệ thống...',
+      aiInsights: 'Kiến thức kỹ thuật xuất sắc, có kinh nghiệm với hệ thống có thể mở rộng, phương pháp giải quyết vấn đề tốt.',
     },
   ]);
 
+  // Timer effect for call duration
+  useEffect(() => {
+    if (currentCall?.status === 'active' && settings) {
+      const maxDuration = settings.maxCallDuration * 60; // Convert to seconds
+      setTimeRemaining(maxDuration);
+      
+      const interval = setInterval(() => {
+        setCurrentCall(prev => {
+          if (!prev) return null;
+          const newDuration = prev.duration + 1;
+          setTimeRemaining(maxDuration - newDuration);
+          
+          // Warning notification
+          if (settings.enableCallTimeWarning && 
+              maxDuration - newDuration === settings.warningTime * 60) {
+            toast.warning(`Cuộc gọi sẽ kết thúc sau ${settings.warningTime} phút`, {
+              duration: 5000,
+            });
+          }
+          
+          // Auto end call if enabled
+          if (settings.autoEndCall && newDuration >= maxDuration) {
+            handleEndCall();
+            return prev;
+          }
+          
+          return { ...prev, duration: newDuration };
+        });
+      }, 1000);
+      
+      setCallTimer(interval);
+      return () => {
+        if (interval) clearInterval(interval);
+      };
+    }
+  }, [currentCall?.status, settings]);
+
   const handleStartCall = async () => {
     if (!selectedCandidate) {
-      toast.error('Please select a candidate to call');
+      toast.error('Vui lòng chọn ứng viên để gọi');
+      return;
+    }
+
+    if (!settings || !settings.twilioAccountSid || !settings.twilioAuthToken || !settings.elevenlabsApiKey) {
+      toast.error('Vui lòng cấu hình API keys trước khi gọi');
       return;
     }
 
     const candidate = candidates.find(c => c.id === selectedCandidate);
     if (!candidate) return;
+
+    // Create Vietnamese or English prompt based on settings
+    const vietnamesePrompt = settings.language === 'vi' 
+      ? `Bạn là một AI phỏng vấn viên chuyên nghiệp. Hãy tiến hành cuộc phỏng vấn bằng tiếng Việt với ứng viên ${candidate.name} cho vị trí ${candidate.position}. ${aiPrompt}`
+      : `You are a professional AI interviewer. Conduct an interview with candidate ${candidate.name} for the ${candidate.position} position. ${aiPrompt}`;
 
     // Start the call process
     setCurrentCall({
@@ -83,6 +140,8 @@ export const VoiceCallPanel = () => {
       candidatePhone: candidate.phone,
       duration: 0,
       status: 'connecting',
+      maxDuration: settings.maxCallDuration * 60,
+      startTime: new Date(),
     });
 
     try {
@@ -91,7 +150,10 @@ export const VoiceCallPanel = () => {
         body: {
           candidatePhone: candidate.phone,
           candidateName: candidate.name,
-          aiPrompt: aiPrompt,
+          aiPrompt: vietnamesePrompt,
+          language: settings.language,
+          maxDuration: settings.maxCallDuration,
+          recordCall: settings.recordCalls,
         },
       });
 
@@ -104,28 +166,34 @@ export const VoiceCallPanel = () => {
         setTimeout(() => {
           setCurrentCall(prev => prev ? { ...prev, status: 'active' } : null);
           setIsRecording(true);
-          toast.success(`Call connected to ${candidate.name}!`);
+          toast.success(`Đã kết nối cuộc gọi với ${candidate.name}!`);
         }, 2000);
       } else {
         throw new Error(data?.error || 'Failed to initiate call');
       }
     } catch (error) {
       console.error('Error initiating call:', error);
-      toast.error('Failed to initiate call. Please check your Twilio configuration.');
+      toast.error('Không thể bắt đầu cuộc gọi. Vui lòng kiểm tra cấu hình Twilio.');
       setCurrentCall(null);
     }
   };
 
   const handleEndCall = () => {
     if (currentCall) {
+      if (callTimer) {
+        clearInterval(callTimer);
+        setCallTimer(null);
+      }
+      
       setCurrentCall(prev => prev ? { ...prev, status: 'completed' } : null);
       setIsRecording(false);
-      toast.success('Call ended. Processing AI insights...');
+      toast.success('Cuộc gọi đã kết thúc. Đang xử lý phân tích AI...');
       
       // Reset after a delay
       setTimeout(() => {
         setCurrentCall(null);
         setSelectedCandidate('');
+        setTimeRemaining(0);
       }, 3000);
     }
   };
@@ -138,193 +206,237 @@ export const VoiceCallPanel = () => {
 
   return (
     <div className="space-y-6">
-      {/* Setup Panel */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Settings className="h-5 w-5" />
-              Call Setup
-            </CardTitle>
-            <CardDescription>
-              Configure your AI voice interview
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <label className="text-sm font-medium mb-2 block">Select Candidate</label>
-              <Select value={selectedCandidate} onValueChange={setSelectedCandidate}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose a candidate to call" />
-                </SelectTrigger>
-                <SelectContent>
-                  {candidates.map((candidate) => (
-                    <SelectItem key={candidate.id} value={candidate.id}>
-                      <div className="flex items-center gap-2">
-                        <span>{candidate.name}</span>
-                        <span className="text-muted-foreground">- {candidate.position}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <label className="text-sm font-medium mb-2 block">AI Interview Prompt</label>
-              <Textarea
-                value={aiPrompt}
-                onChange={(e) => setAiPrompt(e.target.value)}
-                placeholder="Describe what the AI should focus on during the interview..."
-                rows={3}
-              />
-            </div>
-
-            <Alert>
-              <Info className="h-4 w-4" />
-              <AlertDescription>
-                <strong>Ready!</strong> AI voice calling is now integrated with Twilio and ElevenLabs. 
-                Make sure your Twilio phone number is configured and you have sufficient credits.
-              </AlertDescription>
-            </Alert>
-          </CardContent>
-        </Card>
-
-        {/* Active Call Panel */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <PhoneCall className="h-5 w-5" />
-              {currentCall ? 'Active Call' : 'Ready to Call'}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {currentCall ? (
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-12 w-12">
-                    <AvatarFallback className="bg-primary-light text-primary">
-                      {currentCall.candidateName.split(' ').map(n => n[0]).join('')}
-                    </AvatarFallback>
-                  </Avatar>
+      <Tabs defaultValue="call" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="call">Cuộc gọi AI</TabsTrigger>
+          <TabsTrigger value="settings">Cài đặt</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="settings" className="mt-6">
+          <VoiceSettings onSettingsChange={setSettings} />
+        </TabsContent>
+        
+        <TabsContent value="call" className="mt-6">
+          <div className="space-y-6">
+            {/* Setup Panel */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Settings className="h-5 w-5" />
+                    Thiết lập cuộc gọi
+                  </CardTitle>
+                  <CardDescription>
+                    Cấu hình cuộc phỏng vấn AI bằng giọng nói
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
                   <div>
-                    <h3 className="font-semibold">{currentCall.candidateName}</h3>
-                    <p className="text-sm text-muted-foreground">{currentCall.candidatePhone}</p>
+                    <label className="text-sm font-medium mb-2 block">Chọn ứng viên</label>
+                    <Select value={selectedCandidate} onValueChange={setSelectedCandidate}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Chọn ứng viên để gọi" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {candidates.map((candidate) => (
+                          <SelectItem key={candidate.id} value={candidate.id}>
+                            <div className="flex items-center gap-2">
+                              <span>{candidate.name}</span>
+                              <span className="text-muted-foreground">- {candidate.position}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                </div>
 
-                <div className="flex items-center justify-between">
-                  <Badge className={
-                    currentCall.status === 'active' ? 'bg-success-light text-success' :
-                    currentCall.status === 'connecting' ? 'bg-warning-light text-warning' :
-                    'bg-muted text-muted-foreground'
-                  }>
-                    {currentCall.status}
-                  </Badge>
-                  <span className="text-sm font-mono">
-                    {formatDuration(currentCall.duration)}
-                  </span>
-                </div>
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Hướng dẫn AI phỏng vấn</label>
+                    <Textarea
+                      value={aiPrompt}
+                      onChange={(e) => setAiPrompt(e.target.value)}
+                      placeholder="Mô tả những gì AI nên tập trung trong cuộc phỏng vấn..."
+                      rows={3}
+                    />
+                  </div>
 
-                <div className="flex justify-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsMuted(!isMuted)}
-                    className={isMuted ? 'bg-destructive-light text-destructive' : ''}
-                  >
-                    {isMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    onClick={handleEndCall}
-                    disabled={currentCall.status !== 'active'}
-                  >
-                    <Square className="h-4 w-4 mr-2" />
-                    End Call
-                  </Button>
-                </div>
+                  {settings && settings.twilioAccountSid && settings.elevenlabsApiKey ? (
+                    <Alert className="border-success bg-success-light">
+                      <Info className="h-4 w-4" />
+                      <AlertDescription>
+                        <strong>Sẵn sàng!</strong> Hệ thống gọi điện AI đã được tích hợp với Twilio và ElevenLabs.
+                        Ngôn ngữ: {settings.language === 'vi' ? 'Tiếng Việt' : 'English'}. 
+                        Thời gian tối đa: {settings.maxCallDuration} phút.
+                      </AlertDescription>
+                    </Alert>
+                  ) : (
+                    <Alert className="border-warning bg-warning-light">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertDescription>
+                        <strong>Cần cấu hình!</strong> Vui lòng chuyển sang tab "Cài đặt" để nhập API keys.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </CardContent>
+              </Card>
 
-                {isRecording && (
-                  <div className="text-center">
-                    <div className="inline-flex items-center gap-2 text-sm text-success">
-                      <div className="w-2 h-2 bg-success rounded-full animate-pulse" />
-                      Recording & analyzing conversation...
+              {/* Active Call Panel */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <PhoneCall className="h-5 w-5" />
+                    {currentCall ? 'Cuộc gọi đang diễn ra' : 'Sẵn sàng gọi'}
+                  </CardTitle>
+                  {currentCall?.status === 'active' && settings && (
+                    <CardDescription className="flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      Thời gian còn lại: {Math.max(0, Math.floor(timeRemaining / 60))}:{(Math.max(0, timeRemaining % 60)).toString().padStart(2, '0')}
+                    </CardDescription>
+                  )}
+                </CardHeader>
+                <CardContent>
+                  {currentCall ? (
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-12 w-12">
+                          <AvatarFallback className="bg-primary-light text-primary">
+                            {currentCall.candidateName.split(' ').map(n => n[0]).join('')}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <h3 className="font-semibold">{currentCall.candidateName}</h3>
+                          <p className="text-sm text-muted-foreground">{currentCall.candidatePhone}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <Badge className={
+                          currentCall.status === 'active' ? 'bg-success-light text-success' :
+                          currentCall.status === 'connecting' ? 'bg-warning-light text-warning' :
+                          'bg-muted text-muted-foreground'
+                        }>
+                          {currentCall.status === 'active' ? 'Đang gọi' :
+                           currentCall.status === 'connecting' ? 'Đang kết nối' :
+                           currentCall.status === 'completed' ? 'Đã hoàn thành' : currentCall.status}
+                        </Badge>
+                        <div className="text-right">
+                          <span className="text-sm font-mono">
+                            {formatDuration(currentCall.duration)}
+                          </span>
+                          {settings && timeRemaining > 0 && timeRemaining < 300 && (
+                            <div className="text-xs text-warning">
+                              Còn {Math.floor(timeRemaining / 60)}:{(timeRemaining % 60).toString().padStart(2, '0')}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex justify-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setIsMuted(!isMuted)}
+                          className={isMuted ? 'bg-destructive-light text-destructive' : ''}
+                        >
+                          {isMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          onClick={handleEndCall}
+                          disabled={currentCall.status !== 'active'}
+                        >
+                          <Square className="h-4 w-4 mr-2" />
+                          Kết thúc
+                        </Button>
+                      </div>
+
+                      {isRecording && (
+                        <div className="text-center">
+                          <div className="inline-flex items-center gap-2 text-sm text-success">
+                            <div className="w-2 h-2 bg-success rounded-full animate-pulse" />
+                            Đang ghi âm & phân tích cuộc trò chuyện...
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <Phone className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground mb-4">Ready to start AI-powered interview</p>
-                <Button 
-                  onClick={handleStartCall} 
-                  className="gap-2"
-                  disabled={!selectedCandidate}
-                >
-                  <PhoneCall className="h-4 w-4" />
-                  Start Call
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Call History */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Voice Interviews</CardTitle>
-          <CardDescription>
-            Review past AI-conducted interviews and insights
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {callHistory.map((call) => (
-              <div key={call.id} className="border rounded-lg p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Avatar>
-                      <AvatarFallback className="bg-accent text-accent-foreground">
-                        {call.candidateName.split(' ').map(n => n[0]).join('')}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <h4 className="font-medium">{call.candidateName}</h4>
-                      <p className="text-sm text-muted-foreground">{call.candidatePhone}</p>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Phone className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground mb-4">
+                        {!settings || !settings.twilioAccountSid || !settings.elevenlabsApiKey 
+                          ? 'Vui lòng cấu hình API keys trong tab Cài đặt'
+                          : 'Sẵn sàng bắt đầu phỏng vấn AI'
+                        }
+                      </p>
+                      <Button 
+                        onClick={handleStartCall} 
+                        className="gap-2"
+                        disabled={!selectedCandidate || !settings?.twilioAccountSid || !settings?.elevenlabsApiKey}
+                      >
+                        <PhoneCall className="h-4 w-4" />
+                        Bắt đầu gọi
+                      </Button>
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <Badge className="bg-success-light text-success">Completed</Badge>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {formatDuration(call.duration)}
-                    </p>
-                  </div>
-                </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+            {/* Call History */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Lịch sử phỏng vấn giọng nói</CardTitle>
+                <CardDescription>
+                  Xem lại các cuộc phỏng vấn AI đã thực hiện và phân tích
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {callHistory.map((call) => (
+                    <div key={call.id} className="border rounded-lg p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <Avatar>
+                            <AvatarFallback className="bg-accent text-accent-foreground">
+                              {call.candidateName.split(' ').map(n => n[0]).join('')}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <h4 className="font-medium">{call.candidateName}</h4>
+                            <p className="text-sm text-muted-foreground">{call.candidatePhone}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <Badge className="bg-success-light text-success">Hoàn thành</Badge>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {formatDuration(call.duration)}
+                          </p>
+                        </div>
+                      </div>
 
-                {call.aiInsights && (
-                  <div className="bg-accent/20 rounded-md p-3">
-                    <h5 className="font-medium text-sm mb-1">AI Insights</h5>
-                    <p className="text-sm text-muted-foreground">{call.aiInsights}</p>
-                  </div>
-                )}
+                      {call.aiInsights && (
+                        <div className="bg-accent/20 rounded-md p-3">
+                          <h5 className="font-medium text-sm mb-1">Phân tích AI</h5>
+                          <p className="text-sm text-muted-foreground">{call.aiInsights}</p>
+                        </div>
+                      )}
 
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm">
-                    <Play className="h-3 w-3 mr-1" />
-                    Replay
-                  </Button>
-                  <Button variant="outline" size="sm">
-                    View Transcript
-                  </Button>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm">
+                          <Play className="h-3 w-3 mr-1" />
+                          Phát lại
+                        </Button>
+                        <Button variant="outline" size="sm">
+                          Xem bản ghi
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </div>
-            ))}
+              </CardContent>
+            </Card>
           </div>
-        </CardContent>
-      </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
