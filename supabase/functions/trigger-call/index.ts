@@ -13,13 +13,21 @@ serve(async (req) => {
   }
 
   try {
-    const url = new URL(req.url);
-    const interviewId = url.pathname.split('/').pop()?.replace('/call', '');
+    const { interviewId } = await req.json();
     
     console.log('Trigger call request for interview:', interviewId);
     
     if (!interviewId) {
       return new Response(JSON.stringify({ error: 'Interview ID is required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(interviewId)) {
+      return new Response(JSON.stringify({ error: 'Invalid interview ID format' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
