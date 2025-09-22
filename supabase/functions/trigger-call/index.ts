@@ -77,6 +77,8 @@ serve(async (req) => {
     formData.append('From', TWILIO_PHONE_NUMBER);
     formData.append('Url', `${supabaseUrl}/functions/v1/twilio-answer?interview_id=${interviewId}`);
     formData.append('Method', 'POST');
+    formData.append('Record', 'true');
+    formData.append('RecordingStatusCallback', `${supabaseUrl}/functions/v1/process-recording`);
 
     const response = await fetch(twilioUrl, {
       method: 'POST',

@@ -15,8 +15,6 @@ interface VoiceSettingsProps {
 }
 
 export interface VoiceSettings {
-  vbeeApiKey: string;
-  vbeeVoiceId: string;
   twilioAccountSid: string;
   twilioAuthToken: string;
   twilioPhoneNumber: string;
@@ -30,8 +28,6 @@ export interface VoiceSettings {
 
 export const VoiceSettings = ({ onSettingsChange }: VoiceSettingsProps) => {
   const [settings, setSettings] = useState<VoiceSettings>({
-    vbeeApiKey: '',
-    vbeeVoiceId: 'vi-female-1', // Default Vietnamese female voice
     twilioAccountSid: '',
     twilioAuthToken: '',
     twilioPhoneNumber: '',
@@ -67,10 +63,6 @@ export const VoiceSettings = ({ onSettingsChange }: VoiceSettingsProps) => {
 
   const handleSave = () => {
     // Validate required fields
-    if (!settings.vbeeApiKey) {
-      toast.error('Vui lòng nhập vBee API Key để sử dụng tính năng gọi điện AI');
-      return;
-    }
     if (!settings.twilioAccountSid || !settings.twilioAuthToken || !settings.twilioPhoneNumber) {
       toast.error('Vui lòng nhập đầy đủ thông tin Twilio (Account SID, Auth Token, Phone Number)');
       return;
@@ -79,7 +71,7 @@ export const VoiceSettings = ({ onSettingsChange }: VoiceSettingsProps) => {
     toast.success('Cài đặt đã được lưu thành công!');
   };
 
-  const isConfigured = settings.vbeeApiKey && settings.twilioAccountSid && settings.twilioAuthToken && settings.twilioPhoneNumber;
+  const isConfigured = settings.twilioAccountSid && settings.twilioAuthToken && settings.twilioPhoneNumber;
 
   return (
     <div className="space-y-6">
@@ -89,7 +81,7 @@ export const VoiceSettings = ({ onSettingsChange }: VoiceSettingsProps) => {
         <AlertDescription>
         {isConfigured 
           ? '✓ Hệ thống đã được cấu hình và sẵn sàng sử dụng'
-          : '⚠️ Cần nhập vBee API Key và thông tin Twilio để sử dụng tính năng gọi điện AI'
+          : '⚠️ Cần nhập thông tin Twilio để sử dụng tính năng gọi điện AI'
         }
         </AlertDescription>
       </Alert>
@@ -102,7 +94,7 @@ export const VoiceSettings = ({ onSettingsChange }: VoiceSettingsProps) => {
             Cấu hình API
           </CardTitle>
           <CardDescription>
-            Nhập API keys và cấu hình cho vBee và Twilio
+            Nhập thông tin cấu hình Twilio để thực hiện cuộc gọi
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -115,23 +107,6 @@ export const VoiceSettings = ({ onSettingsChange }: VoiceSettingsProps) => {
           </div>
 
           <div className="space-y-4">
-            <div>
-              <Label htmlFor="vbeeApiKey">vBee API Key</Label>
-              <Input
-                id="vbeeApiKey"
-                type={showApiKeys ? "text" : "password"}
-                value={settings.vbeeApiKey}
-                onChange={(e) => handleSettingChange('vbeeApiKey', e.target.value)}
-                placeholder="vbee_api_key_••••••••••••••••"
-              />
-              <p className="text-sm text-muted-foreground mt-1">
-                Lấy API key từ{' '}
-                <a href="https://vbee.ai/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                  vBee.ai
-                </a>
-              </p>
-            </div>
-
             <div>
               <Label htmlFor="twilioAccountSid">Twilio Account SID</Label>
               <Input
@@ -166,26 +141,6 @@ export const VoiceSettings = ({ onSettingsChange }: VoiceSettingsProps) => {
               <p className="text-sm text-muted-foreground mt-1">
                 Số điện thoại Twilio để thực hiện cuộc gọi (bao gồm mã quốc gia)
               </p>
-            </div>
-
-            <div>
-              <Label htmlFor="vbeeVoice">Giọng nói vBee</Label>
-              <Select 
-                value={settings.vbeeVoiceId} 
-                onValueChange={(value) => handleSettingChange('vbeeVoiceId', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="vi-female-1">Nữ miền Bắc - Tự nhiên</SelectItem>
-                  <SelectItem value="vi-female-2">Nữ miền Nam - Dễ thương</SelectItem>
-                  <SelectItem value="vi-male-1">Nam miền Bắc - Chuyên nghiệp</SelectItem>
-                  <SelectItem value="vi-male-2">Nam miền Nam - Thân thiện</SelectItem>
-                  <SelectItem value="vi-female-young">Nữ trẻ - Năng động</SelectItem>
-                  <SelectItem value="vi-male-young">Nam trẻ - Năng động</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
           </div>
         </CardContent>
