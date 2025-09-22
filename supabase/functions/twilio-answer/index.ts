@@ -89,10 +89,60 @@ serve(async (req) => {
       timeout: 30
     };
 
-    // Generate greeting message based on language
+    // Generate greeting message and TwiML with ElevenLabs voice integration
     const greeting = interview.language === 'vi' 
       ? `Xin chào! Đây là cuộc phỏng vấn AI cho vị trí ${interview.role || 'ứng viên'}. Cuộc gọi này sẽ được ghi âm để đánh giá. Bạn có đồng ý không?`
       : `Hello! This is an AI interview for the ${interview.role || 'candidate'} position. This call will be recorded for evaluation. Do you consent?`;
+    
+    const elevenLabsApiKey = Deno.env.get('ELEVENLABS_API_KEY');
+    let voiceContent = currentQuestion.text;
+    
+    if (elevenLabsApiKey) {
+      // Use ElevenLabs for more natural voice
+      try {
+        const elevenLabsResponse = await fetch('https://api.elevenlabs.io/v1/text-to-speech/9BWtsMINqrJLrRacOk9x', {
+          method: 'POST',
+          headers: {
+            'Accept': 'audio/mpeg',
+            'Content-Type': 'application/json',
+            'xi-api-key': elevenLabsApiKey
+          },
+          body: JSON.stringify({
+            text: `${greeting} ${currentQuestion.text}`,
+            model_id: 'eleven_multilingual_v2',
+            voice_settings: {
+              stability: 0.5,
+              similarity_boost: 0.8,
+              style: 0.0,
+              use_speaker_boost: true
+            }
+          })
+        });
+
+        if (elevenLabsResponse.ok) {
+          const audioBuffer = await elevenLabsResponse.arrayBuffer();
+          const base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioBuffer)));
+          
+          // Create TwiML with ElevenLabs audio
+          const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Play>data:audio/mpeg;base64,${base64Audio}</Play>
+  <Pause length="1"/>
+  <Record timeout="10" finishOnKey="#" action="https://${url.host}/functions/v1/process-question-response?interview_id=${interviewId}&amp;question_index=${currentQuestionIndex}" transcribe="true" transcribeCallback="https://${url.host}/functions/v1/process-transcription?interview_id=${interviewId}&amp;question_index=${currentQuestionIndex}"/>
+  <Say voice="alice" language="${interview.language === 'vi' ? 'vi-VN' : 'en-US'}">
+    ${interview.language === 'vi' ? 'Cảm ơn câu trả lời của bạn.' : 'Thank you for your response.'}
+  </Say>
+</Response>`;
+          
+          return new Response(twiml, {
+            headers: { ...corsHeaders, 'Content-Type': 'text/xml' },
+          });
+        }
+      } catch (elevenLabsError) {
+        console.error('ElevenLabs API error:', elevenLabsError);
+        // Fallback to Twilio voice
+      }
+    }
 
     // Create dynamic TwiML with interview questions
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>

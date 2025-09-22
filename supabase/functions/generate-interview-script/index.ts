@@ -40,9 +40,15 @@ serve(async (req) => {
     const role = interview.role || 'candidate';
     const language = interview.language || 'vi';
 
-    // Generate interview script using OpenAI
+    // Generate interview script using OpenAI with custom prompt
+    const basePrompt = interview.metadata?.aiPrompt || (language === 'vi' 
+      ? 'Bạn là một AI phỏng vấn chuyên nghiệp. Hãy thực hiện cuộc phỏng vấn một cách thân thiện nhưng chuyên nghiệp.'
+      : 'You are a professional AI interviewer. Conduct interviews in a friendly but professional manner.');
+
     const scriptPrompt = language === 'vi' 
-      ? `Tạo một kịch bản phỏng vấn cho vị trí "${role}". Tạo 5 câu hỏi phỏng vấn tiếng Việt theo thứ tự từ dễ đến khó:
+      ? `${basePrompt}
+        
+        Tạo một kịch bản phỏng vấn cho vị trí "${role}". Tạo 5 câu hỏi phỏng vấn tiếng Việt theo thứ tự từ dễ đến khó:
         1. Câu hỏi giới thiệu bản thân
         2. Câu hỏi về kinh nghiệm làm việc
         3. Câu hỏi kỹ thuật cơ bản về vị trí này
@@ -61,7 +67,9 @@ serve(async (req) => {
             }
           ]
         }`
-      : `Create an interview script for the "${role}" position. Generate 5 English interview questions in order from easy to difficult:
+      : `${basePrompt}
+        
+        Create an interview script for the "${role}" position. Generate 5 English interview questions in order from easy to difficult:
         1. Self-introduction question
         2. Work experience question  
         3. Basic technical question for this position

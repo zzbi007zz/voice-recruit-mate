@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
@@ -24,6 +25,7 @@ export interface VoiceSettings {
   language: 'vi' | 'en';
   autoEndCall: boolean;
   recordCalls: boolean;
+  aiPrompt: string;
 }
 
 export const VoiceSettings = ({ onSettingsChange }: VoiceSettingsProps) => {
@@ -37,6 +39,7 @@ export const VoiceSettings = ({ onSettingsChange }: VoiceSettingsProps) => {
     language: 'vi',
     autoEndCall: true,
     recordCalls: true,
+    aiPrompt: 'Bạn là một AI phỏng vấn chuyên nghiệp. Hãy thực hiện cuộc phỏng vấn một cách thân thiện nhưng chuyên nghiệp, đặt câu hỏi phù hợp và đánh giá ứng viên khách quan.',
   });
 
   const [showApiKeys, setShowApiKeys] = useState(false);
@@ -246,6 +249,35 @@ export const VoiceSettings = ({ onSettingsChange }: VoiceSettingsProps) => {
               checked={settings.recordCalls}
               onCheckedChange={(checked) => handleSettingChange('recordCalls', checked)}
             />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* AI Prompt Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Settings className="h-5 w-5" />
+            Hướng dẫn AI phỏng vấn
+          </CardTitle>
+          <CardDescription>
+            Tùy chỉnh cách AI thực hiện phỏng vấn
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label htmlFor="aiPrompt">Hướng dẫn cho AI</Label>
+            <Textarea
+              id="aiPrompt"
+              value={settings.aiPrompt}
+              onChange={(e) => handleSettingChange('aiPrompt', e.target.value)}
+              placeholder="Nhập hướng dẫn cho AI về cách thực hiện phỏng vấn..."
+              rows={4}
+              className="mt-1"
+            />
+            <p className="text-sm text-muted-foreground mt-1">
+              Mô tả cách AI nên thực hiện phỏng vấn, phong cách giao tiếp và tiêu chí đánh giá
+            </p>
           </div>
         </CardContent>
       </Card>

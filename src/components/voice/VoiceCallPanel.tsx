@@ -33,11 +33,12 @@ interface CallSession {
   candidateName: string;
   candidatePhone: string;
   duration: number;
-  status: 'idle' | 'connecting' | 'active' | 'completed' | 'error';
+  status: 'idle' | 'connecting' | 'ringing' | 'active' | 'completed' | 'failed' | 'error';
   transcript?: string;
   aiInsights?: string;
   maxDuration?: number;
   startTime?: Date;
+  callSid?: string;
   interviewId?: string;
 }
 
@@ -177,7 +178,7 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
           role: candidate.position || 'Software Developer',
           language: settings.language,
           metadata: {
-            aiPrompt: aiPrompt,
+            aiPrompt: settings?.aiPrompt,
             candidateName: candidate.name
           }
         }
@@ -209,6 +210,7 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
         candidatePhone: candidate.phone,
         duration: 0,
         status: 'connecting',
+        callSid: callData.call?.sid,
         interviewId: interview.id
       });
       
@@ -281,26 +283,43 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
     }
   };
 
-  const handleEndCall = () => {
+  const handleEndCall = async () => {
     if (currentCall) {
-      if (callTimer) {
-        clearInterval(callTimer);
-        setCallTimer(null);
+      try {
+        // Terminate the actual Twilio call
+        if (currentCall.callSid) {
+          await supabase.functions.invoke('end-call', {
+            body: { callSid: currentCall.callSid }
+          });
+        }
+        
+        if (callTimer) {
+          clearInterval(callTimer);
+          setCallTimer(null);
+        }
+        
+        setCurrentCall(prev => prev ? { ...prev, status: 'completed' } : null);
+        setCallStatus('idle');
+        setIsRecording(false);
+        toast({
+          title: "Cuộc gọi đã kết thúc",
+          description: "Đang xử lý phân tích AI...",
+        });
+        
+        // Reset after a delay
+        setTimeout(() => {
+          setCurrentCall(null);
+          setSelectedCandidate('');
+          setTimeRemaining(0);
+        }, 3000);
+      } catch (error) {
+        console.error('Error ending call:', error);
+        toast({
+          title: "Lỗi",
+          description: "Không thể kết thúc cuộc gọi",
+          variant: "destructive",
+        });
       }
-      
-      setCurrentCall(prev => prev ? { ...prev, status: 'completed' } : null);
-      setIsRecording(false);
-      toast({
-        title: "Cuộc gọi đã kết thúc",
-        description: "Đang xử lý phân tích AI...",
-      });
-      
-      // Reset after a delay
-      setTimeout(() => {
-        setCurrentCall(null);
-        setSelectedCandidate('');
-        setTimeRemaining(0);
-      }, 3000);
     }
   };
 
@@ -450,7 +469,7 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
                         <Button
                           variant="destructive"
                           onClick={handleEndCall}
-                          disabled={currentCall.status !== 'active'}
+                          disabled={callStatus === 'idle' || callStatus === 'completed'}
                         >
                           <Square className="h-4 w-4 mr-2" />
                           Kết thúc
