@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      call_sessions: {
+        Row: {
+          call_sid: string
+          created_at: string
+          direction: string | null
+          id: string
+          interview_id: string
+          status: string | null
+          twilio_from: string | null
+          twilio_to: string | null
+          updated_at: string
+        }
+        Insert: {
+          call_sid: string
+          created_at?: string
+          direction?: string | null
+          id?: string
+          interview_id: string
+          status?: string | null
+          twilio_from?: string | null
+          twilio_to?: string | null
+          updated_at?: string
+        }
+        Update: {
+          call_sid?: string
+          created_at?: string
+          direction?: string | null
+          id?: string
+          interview_id?: string
+          status?: string | null
+          twilio_from?: string | null
+          twilio_to?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "call_sessions_interview_id_fkey"
+            columns: ["interview_id"]
+            isOneToOne: false
+            referencedRelation: "interviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       candidates: {
         Row: {
           created_at: string
@@ -131,6 +175,54 @@ export type Database = {
           request_id?: string | null
           session_id?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      interviews: {
+        Row: {
+          candidate_phone: string
+          consent: boolean | null
+          created_at: string
+          ended_at: string | null
+          id: string
+          language: string
+          metadata: Json | null
+          recruiter_id: string
+          role: string | null
+          score_summary: Json | null
+          started_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          candidate_phone: string
+          consent?: boolean | null
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          language?: string
+          metadata?: Json | null
+          recruiter_id: string
+          role?: string | null
+          score_summary?: Json | null
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          candidate_phone?: string
+          consent?: boolean | null
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          language?: string
+          metadata?: Json | null
+          recruiter_id?: string
+          role?: string | null
+          score_summary?: Json | null
+          started_at?: string | null
+          status?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -255,6 +347,44 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transcripts: {
+        Row: {
+          audio_segment_id: string | null
+          created_at: string
+          filler_rate: number | null
+          id: string
+          interview_id: string
+          text: string
+          wpm: number | null
+        }
+        Insert: {
+          audio_segment_id?: string | null
+          created_at?: string
+          filler_rate?: number | null
+          id?: string
+          interview_id: string
+          text: string
+          wpm?: number | null
+        }
+        Update: {
+          audio_segment_id?: string | null
+          created_at?: string
+          filler_rate?: number | null
+          id?: string
+          interview_id?: string
+          text?: string
+          wpm?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transcripts_interview_id_fkey"
+            columns: ["interview_id"]
+            isOneToOne: false
+            referencedRelation: "interviews"
             referencedColumns: ["id"]
           },
         ]

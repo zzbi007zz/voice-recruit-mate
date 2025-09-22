@@ -17,3 +17,24 @@ verify_jwt = false
 
 [functions.analyze-cv]
 verify_jwt = false
+
+[functions.create-interview]
+verify_jwt = false
+
+[functions.trigger-call]
+verify_jwt = false
+
+[functions.twilio-answer]
+verify_jwt = false
+
+[functions.twilio-stream]
+verify_jwt = false
+
+[functions.vbee-callback]
+verify_jwt = false
+
+[functions.get-interview]
+verify_jwt = false
+
+[functions.end-interview]
+verify_jwt = false
