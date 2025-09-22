@@ -55,6 +55,11 @@ const Index = () => {
     setShowAssignForm(true);
   };
 
+  const handleCallCandidate = (candidate: any) => {
+    setSelectedCandidate(candidate);
+    setActiveTab('voice-calls');
+  };
+
   const handleEditClient = (client: any) => {
     setEditingClient(client);
     setIsAddClientOpen(true);
@@ -224,6 +229,7 @@ const Index = () => {
                   onEditCandidate={handleEditCandidate}
                   onScheduleInterview={handleScheduleInterview}
                   onAssignToJob={handleAssignToJob}
+                  onCallCandidate={handleCallCandidate}
                   refresh={candidatesRefresh}
                 />
               </CardContent>
@@ -300,7 +306,7 @@ const Index = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <VoiceCallPanel />
+                <VoiceCallPanel selectedCandidate={selectedCandidate} />
               </CardContent>
             </Card>
           </TabsContent>

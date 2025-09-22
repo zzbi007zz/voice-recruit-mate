@@ -37,7 +37,11 @@ interface CallSession {
   startTime?: Date;
 }
 
-export const VoiceCallPanel = () => {
+interface VoiceCallPanelProps {
+  selectedCandidate?: any;
+}
+
+export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: VoiceCallPanelProps) => {
   const [currentCall, setCurrentCall] = useState<CallSession | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -46,14 +50,30 @@ export const VoiceCallPanel = () => {
   const [settings, setSettings] = useState<VoiceSettingsType | null>(null);
   const [callTimer, setCallTimer] = useState<NodeJS.Timeout | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<number>(0);
+  const [candidates, setCandidates] = useState<any[]>([]);
 
-  // Vietnamese candidates for demo
-  const candidates = [
-    { id: '1', name: 'Nguyễn Văn An', phone: '+84 901 234 567', position: 'Frontend Developer' },
-    { id: '2', name: 'Trần Thị Minh', phone: '+84 902 345 678', position: 'Backend Developer' },
-    { id: '3', name: 'Lê Hoàng Nam', phone: '+84 903 456 789', position: 'Full Stack Developer' },
-    { id: '4', name: 'Phạm Thị Lan', phone: '+84 904 567 890', position: 'UX/UI Designer' },
-  ];
+  // Fetch candidates from database
+  useEffect(() => {
+    const fetchCandidates = async () => {
+      const { data, error } = await supabase
+        .from('candidates')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (!error && data) {
+        setCandidates(data);
+      }
+    };
+    
+    fetchCandidates();
+  }, []);
+
+  // Auto-select candidate if passed from props
+  useEffect(() => {
+    if (preSelectedCandidate && candidates.length > 0) {
+      setSelectedCandidate(preSelectedCandidate.id);
+    }
+  }, [preSelectedCandidate, candidates]);
 
   // Vietnamese call history
   const [callHistory] = useState<CallSession[]>([

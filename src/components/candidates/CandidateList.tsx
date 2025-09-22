@@ -41,10 +41,11 @@ interface CandidateListProps {
   onEditCandidate: (candidate: Candidate) => void;
   onScheduleInterview: (candidate: Candidate) => void;
   onAssignToJob: (candidate: Candidate) => void;
+  onCallCandidate: (candidate: Candidate) => void;
   refresh?: boolean;
 }
 
-export const CandidateList = ({ onEditCandidate, onScheduleInterview, onAssignToJob, refresh }: CandidateListProps) => {
+export const CandidateList = ({ onEditCandidate, onScheduleInterview, onAssignToJob, onCallCandidate, refresh }: CandidateListProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -200,7 +201,7 @@ export const CandidateList = ({ onEditCandidate, onScheduleInterview, onAssignTo
                         <Calendar className="mr-2 h-4 w-4" />
                         Schedule Interview
                       </DropdownMenuItem>
-                      <DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => onCallCandidate(candidate)}>
                         <Phone className="mr-2 h-4 w-4" />
                         Call Now
                       </DropdownMenuItem>
