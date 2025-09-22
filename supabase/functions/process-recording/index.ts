@@ -1,5 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -92,13 +93,38 @@ serve(async (req) => {
                 
                 console.log('AI Insights:', aiInsights);
                 
-                // Here you would typically save to database
-                // For now, just log the results
-                console.log('Interview analysis completed:', {
-                  callSid,
-                  transcript: transcription.text,
-                  aiInsights
-                });
+                // Store final interview analysis in database
+                const supabaseUrl = Deno.env.get('SUPABASE_URL');
+                const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+                
+                if (supabaseUrl && supabaseServiceKey) {
+                  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+                  
+                  // Try to find interview by call_sid
+                  const { data: callSession } = await supabase
+                    .from('call_sessions')
+                    .select('interview_id')
+                    .eq('call_sid', callSid)
+                    .single();
+
+                  if (callSession) {
+                    // Update interview with final analysis
+                    await supabase
+                      .from('interviews')
+                      .update({
+                        score_summary: aiInsights,
+                        status: 'analyzed',
+                        ended_at: new Date().toISOString()
+                      })
+                      .eq('id', callSession.interview_id);
+
+                    console.log("Interview analysis stored for interview:", callSession.interview_id);
+                  }
+                }
+                
+                // Log the transcription and AI insights
+                console.log("Transcription:", transcription.text);
+                console.log("AI Insights:", aiInsights);
               }
             }
           }

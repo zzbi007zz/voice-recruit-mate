@@ -23,7 +23,9 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { VoiceSettings, type VoiceSettings as VoiceSettingsType } from './VoiceSettings';
+import { VoiceSettings } from './VoiceSettings';
+import { useToast } from '@/components/ui/use-toast';
+import InterviewProgress from '../interviews/InterviewProgress';
 
 interface CallSession {
   id: string;
@@ -35,6 +37,7 @@ interface CallSession {
   aiInsights?: string;
   maxDuration?: number;
   startTime?: Date;
+  interviewId?: string;
 }
 
 interface VoiceCallPanelProps {
@@ -47,10 +50,11 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
   const [isRecording, setIsRecording] = useState(false);
   const [selectedCandidate, setSelectedCandidate] = useState('');
   const [aiPrompt, setAiPrompt] = useState('Thực hiện cuộc phỏng vấn chuyên nghiệp, tập trung vào kỹ năng kỹ thuật và sự phù hợp văn hóa. Hãy hỏi về kinh nghiệm làm việc, dự án đã thực hiện và mục tiêu nghề nghiệp.');
-  const [settings, setSettings] = useState<VoiceSettingsType | null>(null);
+  const [settings, setSettings] = useState<any | null>(null);
   const [callTimer, setCallTimer] = useState<NodeJS.Timeout | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<number>(0);
   const [candidates, setCandidates] = useState<any[]>([]);
+  const { toast } = useToast();
 
   // Fetch candidates from database
   useEffect(() => {
@@ -112,8 +116,10 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
           // Warning notification
           if (settings.enableCallTimeWarning && 
               maxDuration - newDuration === settings.warningTime * 60) {
-            toast.warning(`Cuộc gọi sẽ kết thúc sau ${settings.warningTime} phút`, {
-              duration: 5000,
+            toast({
+              title: "Cảnh báo",
+              description: `Cuộc gọi sẽ kết thúc sau ${settings.warningTime} phút`,
+              variant: "destructive",
             });
           }
           
@@ -136,12 +142,20 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
 
   const handleStartCall = async () => {
     if (!selectedCandidate) {
-      toast.error('Vui lòng chọn ứng viên để gọi');
+      toast({
+        title: "Lỗi",
+        description: 'Vui lòng chọn ứng viên để gọi',
+        variant: "destructive",
+      });
       return;
     }
 
     if (!settings || !settings.twilioAccountSid || !settings.twilioAuthToken || !settings.twilioPhoneNumber) {
-      toast.error('Vui lòng cấu hình đầy đủ thông tin Twilio trước khi gọi');
+      toast({
+        title: "Lỗi",
+        description: 'Vui lòng cấu hình đầy đủ thông tin Twilio trước khi gọi',
+        variant: "destructive",
+      });
       return;
     }
 
@@ -165,7 +179,10 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
     });
 
     try {
-      toast.info('Đang tạo cuộc phỏng vấn...');
+      toast({
+        title: "Thông tin",
+        description: 'Đang tạo cuộc phỏng vấn...',
+      });
       
       // Step 1: Create interview record
       const { data: interviewData, error: interviewError } = await supabase.functions.invoke('create-interview', {
@@ -192,7 +209,10 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
         throw new Error('Failed to create interview');
       }
 
-      toast.info('Đang khởi tạo cuộc gọi...');
+      toast({
+        title: "Thông tin",
+        description: 'Đang khởi tạo cuộc gọi...',
+      });
       
       // Step 2: Trigger Twilio call
       const { data: callData, error: callError } = await supabase.functions.invoke('trigger-call', {
@@ -208,16 +228,27 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
       if (callData?.callSid) {
         // Update call status to active
         setTimeout(() => {
-          setCurrentCall(prev => prev ? { ...prev, status: 'active' } : null);
+          setCurrentCall(prev => prev ? { 
+            ...prev, 
+            status: 'active',
+            interviewId: interviewId 
+          } : null);
           setIsRecording(true);
-          toast.success(`Đã khởi tạo cuộc gọi với ${candidate.name}!`);
+          toast({
+            title: "Cuộc gọi đã bắt đầu",
+            description: `Đã khởi tạo cuộc gọi với ${candidate.name}!`,
+          });
         }, 2000);
       } else {
         throw new Error(callData?.error || 'Failed to initiate call');
       }
     } catch (error) {
       console.error('Error initiating call:', error);
-      toast.error('Không thể bắt đầu cuộc gọi. Vui lòng kiểm tra cấu hình API.');
+      toast({
+        title: "Lỗi",
+        description: 'Không thể bắt đầu cuộc gọi. Vui lòng kiểm tra cấu hình API.',
+        variant: "destructive",
+      });
       setCurrentCall(null);
     }
   };
@@ -231,7 +262,10 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
       
       setCurrentCall(prev => prev ? { ...prev, status: 'completed' } : null);
       setIsRecording(false);
-      toast.success('Cuộc gọi đã kết thúc. Đang xử lý phân tích AI...');
+      toast({
+        title: "Cuộc gọi đã kết thúc",
+        description: "Đang xử lý phân tích AI...",
+      });
       
       // Reset after a delay
       setTimeout(() => {
@@ -251,10 +285,11 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
   return (
     <div className="space-y-6">
       <Tabs defaultValue="call" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="call">Cuộc gọi AI</TabsTrigger>
-          <TabsTrigger value="settings">Cài đặt</TabsTrigger>
-        </TabsList>
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="call">Cuộc gọi AI</TabsTrigger>
+            <TabsTrigger value="interview">Phỏng vấn</TabsTrigger>
+            <TabsTrigger value="settings">Cài đặt</TabsTrigger>
+          </TabsList>
         
         <TabsContent value="settings" className="mt-6">
           <VoiceSettings onSettingsChange={setSettings} />
@@ -479,6 +514,23 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="interview">
+          {currentCall?.interviewId ? (
+            <InterviewProgress interviewId={currentCall.interviewId} />
+          ) : (
+            <Card>
+              <CardContent className="p-6 text-center">
+                <p className="text-gray-600">Không có cuộc phỏng vấn đang hoạt động</p>
+                <p className="text-sm text-gray-500 mt-2">Bắt đầu cuộc gọi để xem tiến trình phỏng vấn</p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="settings">
+          <VoiceSettings onSettingsChange={setSettings} />
         </TabsContent>
       </Tabs>
     </div>

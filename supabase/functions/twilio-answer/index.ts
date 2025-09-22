@@ -56,31 +56,63 @@ serve(async (req) => {
       })
       .eq('id', interviewId);
 
+    // Generate interview script if not exists
+    let script = interview.metadata?.script;
+    if (!script) {
+      console.log('Generating interview script...');
+      
+      try {
+        const scriptResponse = await fetch(`https://${url.host}/functions/v1/generate-interview-script`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseServiceKey}`
+          },
+          body: JSON.stringify({ interviewId })
+        });
+        
+        const scriptData = await scriptResponse.json();
+        if (scriptData.success) {
+          script = scriptData.script;
+          console.log('Interview script generated successfully');
+        }
+      } catch (scriptError) {
+        console.error('Failed to generate script:', scriptError);
+      }
+    }
+
+    // Get current question or default to first
+    const currentQuestionIndex = interview.metadata?.current_question || 0;
+    const questions = script?.questions || [];
+    const currentQuestion = questions[currentQuestionIndex] || {
+      text: interview.language === 'vi' ? 'Vui lòng giới thiệu về bản thân.' : 'Please introduce yourself.',
+      timeout: 30
+    };
+
     // Generate greeting message based on language
     const greeting = interview.language === 'vi' 
       ? `Xin chào! Đây là cuộc phỏng vấn AI cho vị trí ${interview.role || 'ứng viên'}. Cuộc gọi này sẽ được ghi âm để đánh giá. Bạn có đồng ý không?`
       : `Hello! This is an AI interview for the ${interview.role || 'candidate'} position. This call will be recorded for evaluation. Do you consent?`;
 
-    // Create TwiML response with Media Stream for real-time processing
-    const wsUrl = `wss://${url.host}/functions/v1/twilio-stream?interview_id=${interviewId}`;
-    
+    // Create dynamic TwiML with interview questions
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="alice" language="${interview.language === 'vi' ? 'vi-VN' : 'en-US'}">
     ${greeting}
   </Say>
-  <Start>
-    <Stream url="${wsUrl}" />
-  </Start>
-  <Pause length="1"/>
+  <Pause length="2"/>
   <Say voice="alice" language="${interview.language === 'vi' ? 'vi-VN' : 'en-US'}">
-    ${interview.language === 'vi' ? 'Cuộc phỏng vấn đang bắt đầu.' : 'The interview is now starting.'}
+    ${interview.language === 'vi' ? 'Cuộc phỏng vấn đang bắt đầu. Câu hỏi đầu tiên:' : 'The interview is now starting. First question:'}
   </Say>
-  <Gather input="speech" timeout="30" speechTimeout="auto">
+  <Pause length="1"/>
+  <Record timeout="10" finishOnKey="#" action="https://${url.host}/functions/v1/process-question-response?interview_id=${interviewId}&amp;question_index=${currentQuestionIndex}" transcribe="true" transcribeCallback="https://${url.host}/functions/v1/process-transcription?interview_id=${interviewId}&amp;question_index=${currentQuestionIndex}">
     <Say voice="alice" language="${interview.language === 'vi' ? 'vi-VN' : 'en-US'}">
-      ${interview.language === 'vi' ? 'Vui lòng giới thiệu về bản thân.' : 'Please introduce yourself.'}
+      ${currentQuestion.text}
     </Say>
-  </Gather>
+  </Record>
+  <Say voice="alice" language="${interview.language === 'vi' ? 'vi-VN' : 'en-US'}">
+    ${interview.language === 'vi' ? 'Cảm ơn câu trả lời của bạn.' : 'Thank you for your response.'}
+  </Say>
 </Response>`;
 
     return new Response(twiml, {
