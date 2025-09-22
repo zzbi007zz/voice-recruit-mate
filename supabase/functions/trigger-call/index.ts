@@ -68,16 +68,29 @@ serve(async (req) => {
       .update({ status: 'calling' })
       .eq('id', interviewId);
 
+    // Format phone numbers properly
+    let candidatePhone = interview.candidate_phone;
+    if (candidatePhone.startsWith('84') && !candidatePhone.startsWith('+84')) {
+      candidatePhone = '+' + candidatePhone;
+    } else if (!candidatePhone.startsWith('+')) {
+      candidatePhone = '+' + candidatePhone;
+    }
+
+    console.log('Calling from:', TWILIO_PHONE_NUMBER, 'to:', candidatePhone);
+
     // Create Twilio call
     const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Calls.json`;
     
     const formData = new URLSearchParams();
-    formData.append('To', interview.candidate_phone);
+    formData.append('To', candidatePhone);
     formData.append('From', TWILIO_PHONE_NUMBER);
     formData.append('Url', `${supabaseUrl}/functions/v1/twilio-answer?interview_id=${interviewId}`);
     formData.append('Method', 'POST');
     formData.append('Record', 'true');
     formData.append('RecordingStatusCallback', `${supabaseUrl}/functions/v1/process-recording`);
+    formData.append('StatusCallback', `${supabaseUrl}/functions/v1/call-status`);
+    formData.append('StatusCallbackEvent', 'initiated,ringing,answered,completed,busy,no-answer,canceled,failed');
+    formData.append('StatusCallbackMethod', 'POST');
 
     const response = await fetch(twilioUrl, {
       method: 'POST',
@@ -103,10 +116,17 @@ serve(async (req) => {
         interview_id: interviewId,
         call_sid: callData.sid,
         twilio_from: TWILIO_PHONE_NUMBER,
-        twilio_to: interview.candidate_phone,
+        twilio_to: candidatePhone,
         direction: 'outbound',
         status: callData.status
       });
+
+    console.log('Call initiated successfully:', {
+      callSid: callData.sid,
+      status: callData.status,
+      to: candidatePhone,
+      from: TWILIO_PHONE_NUMBER
+    });
 
     return new Response(JSON.stringify({
       callSid: callData.sid,
