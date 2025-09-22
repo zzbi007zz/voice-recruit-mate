@@ -140,8 +140,8 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
       return;
     }
 
-    if (!settings || !settings.vbeeApiKey) {
-      toast.error('Vui lòng cấu hình vBee API key trước khi gọi');
+    if (!settings || !settings.vbeeApiKey || !settings.twilioAccountSid || !settings.twilioAuthToken || !settings.twilioPhoneNumber) {
+      toast.error('Vui lòng cấu hình đầy đủ vBee API key và thông tin Twilio trước khi gọi');
       return;
     }
 
@@ -165,37 +165,64 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
     });
 
     try {
-      // Call the Supabase edge function to initiate vBee call
-      const { data, error } = await supabase.functions.invoke('initiate-vbee-call', {
+      toast.info('Đang tạo cuộc phỏng vấn...');
+      
+      // Step 1: Create interview record
+      const { data: interviewData, error: interviewError } = await supabase.functions.invoke('create-interview', {
         body: {
           candidatePhone: candidate.phone,
-          candidateName: candidate.name,
-          aiPrompt: vietnamesePrompt,
+          recruiterId: 'demo-recruiter-id', // In real app, get from auth
+          role: candidate.position,
           language: settings.language,
-          maxDuration: settings.maxCallDuration,
-          recordCall: settings.recordCalls,
-          voiceId: settings.vbeeVoiceId,
-          apiKey: settings.vbeeApiKey,
+          metadata: {
+            candidateName: candidate.name,
+            aiPrompt: vietnamesePrompt,
+            maxDuration: settings.maxCallDuration,
+            recordCall: settings.recordCalls,
+            voiceId: settings.vbeeVoiceId,
+            vbeeApiKey: settings.vbeeApiKey,
+            twilioAccountSid: settings.twilioAccountSid,
+            twilioAuthToken: settings.twilioAuthToken,
+            twilioPhoneNumber: settings.twilioPhoneNumber,
+          },
         },
       });
 
-      if (error) {
-        throw error;
+      if (interviewError) {
+        throw interviewError;
       }
 
-      if (data?.success) {
+      const interviewId = interviewData?.id;
+      if (!interviewId) {
+        throw new Error('Failed to create interview');
+      }
+
+      toast.info('Đang khởi tạo cuộc gọi...');
+      
+      // Step 2: Trigger Twilio call
+      const { data: callData, error: callError } = await supabase.functions.invoke('trigger-call', {
+        body: {
+          interviewId: interviewId,
+        },
+      });
+
+      if (callError) {
+        throw callError;
+      }
+
+      if (callData?.callSid) {
         // Update call status to active
         setTimeout(() => {
           setCurrentCall(prev => prev ? { ...prev, status: 'active' } : null);
           setIsRecording(true);
-          toast.success(`Đã kết nối cuộc gọi với ${candidate.name}!`);
+          toast.success(`Đã khởi tạo cuộc gọi với ${candidate.name}!`);
         }, 2000);
       } else {
-        throw new Error(data?.error || 'Failed to initiate call');
+        throw new Error(callData?.error || 'Failed to initiate call');
       }
     } catch (error) {
       console.error('Error initiating call:', error);
-      toast.error('Không thể bắt đầu cuộc gọi. Vui lòng kiểm tra cấu hình vBee API.');
+      toast.error('Không thể bắt đầu cuộc gọi. Vui lòng kiểm tra cấu hình API.');
       setCurrentCall(null);
     }
   };
@@ -282,11 +309,11 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
                     />
                   </div>
 
-                  {settings && settings.vbeeApiKey ? (
+                  {settings && settings.vbeeApiKey && settings.twilioAccountSid && settings.twilioAuthToken && settings.twilioPhoneNumber ? (
                     <Alert className="border-success bg-success-light">
                       <Info className="h-4 w-4" />
                       <AlertDescription>
-                        <strong>Sẵn sàng!</strong> Hệ thống gọi điện AI đã được tích hợp với vBee.
+                        <strong>Sẵn sàng!</strong> Hệ thống gọi điện AI đã được tích hợp với vBee + Twilio.
                         Giọng nói: {settings.vbeeVoiceId}. 
                         Ngôn ngữ: {settings.language === 'vi' ? 'Tiếng Việt' : 'English'}. 
                         Thời gian tối đa: {settings.maxCallDuration} phút.
@@ -296,7 +323,7 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
                     <Alert className="border-warning bg-warning-light">
                       <AlertTriangle className="h-4 w-4" />
                       <AlertDescription>
-                        <strong>Cần cấu hình!</strong> Vui lòng chuyển sang tab "Cài đặt" để nhập vBee API key.
+                        <strong>Cần cấu hình!</strong> Vui lòng chuyển sang tab "Cài đặt" để nhập vBee API key và thông tin Twilio.
                       </AlertDescription>
                     </Alert>
                   )}
@@ -386,15 +413,15 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
                     <div className="text-center py-8">
                       <Phone className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                       <p className="text-muted-foreground mb-4">
-                        {!settings || !settings.vbeeApiKey 
-                          ? 'Vui lòng cấu hình vBee API key trong tab Cài đặt'
+                        {!settings || !settings.vbeeApiKey || !settings.twilioAccountSid || !settings.twilioAuthToken || !settings.twilioPhoneNumber
+                          ? 'Vui lòng cấu hình vBee API key và thông tin Twilio trong tab Cài đặt'
                           : 'Sẵn sàng bắt đầu phỏng vấn AI'
                         }
                       </p>
                       <Button 
                         onClick={handleStartCall} 
                         className="gap-2"
-                        disabled={!selectedCandidate || !settings?.vbeeApiKey}
+                        disabled={!selectedCandidate || !settings?.vbeeApiKey || !settings?.twilioAccountSid || !settings?.twilioAuthToken || !settings?.twilioPhoneNumber}
                       >
                         <PhoneCall className="h-4 w-4" />
                         Bắt đầu gọi

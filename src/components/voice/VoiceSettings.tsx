@@ -17,6 +17,9 @@ interface VoiceSettingsProps {
 export interface VoiceSettings {
   vbeeApiKey: string;
   vbeeVoiceId: string;
+  twilioAccountSid: string;
+  twilioAuthToken: string;
+  twilioPhoneNumber: string;
   maxCallDuration: number; // minutes
   enableCallTimeWarning: boolean;
   warningTime: number; // minutes before end
@@ -29,6 +32,9 @@ export const VoiceSettings = ({ onSettingsChange }: VoiceSettingsProps) => {
   const [settings, setSettings] = useState<VoiceSettings>({
     vbeeApiKey: '',
     vbeeVoiceId: 'vi-female-1', // Default Vietnamese female voice
+    twilioAccountSid: '',
+    twilioAuthToken: '',
+    twilioPhoneNumber: '',
     maxCallDuration: 30,
     enableCallTimeWarning: true,
     warningTime: 5,
@@ -65,11 +71,15 @@ export const VoiceSettings = ({ onSettingsChange }: VoiceSettingsProps) => {
       toast.error('Vui lòng nhập vBee API Key để sử dụng tính năng gọi điện AI');
       return;
     }
+    if (!settings.twilioAccountSid || !settings.twilioAuthToken || !settings.twilioPhoneNumber) {
+      toast.error('Vui lòng nhập đầy đủ thông tin Twilio (Account SID, Auth Token, Phone Number)');
+      return;
+    }
 
     toast.success('Cài đặt đã được lưu thành công!');
   };
 
-  const isConfigured = settings.vbeeApiKey;
+  const isConfigured = settings.vbeeApiKey && settings.twilioAccountSid && settings.twilioAuthToken && settings.twilioPhoneNumber;
 
   return (
     <div className="space-y-6">
@@ -77,10 +87,10 @@ export const VoiceSettings = ({ onSettingsChange }: VoiceSettingsProps) => {
       <Alert className={isConfigured ? 'border-success bg-success-light' : 'border-warning bg-warning-light'}>
         <Info className="h-4 w-4" />
         <AlertDescription>
-          {isConfigured 
-            ? '✓ Hệ thống đã được cấu hình và sẵn sàng sử dụng'
-            : '⚠️ Cần nhập API keys để sử dụng tính năng gọi điện AI'
-          }
+        {isConfigured 
+          ? '✓ Hệ thống đã được cấu hình và sẵn sàng sử dụng'
+          : '⚠️ Cần nhập vBee API Key và thông tin Twilio để sử dụng tính năng gọi điện AI'
+        }
         </AlertDescription>
       </Alert>
 
@@ -89,10 +99,10 @@ export const VoiceSettings = ({ onSettingsChange }: VoiceSettingsProps) => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Key className="h-5 w-5" />
-            Cấu hình vBee API
+            Cấu hình API
           </CardTitle>
           <CardDescription>
-            Nhập API key và cấu hình giọng nói vBee cho dịch vụ gọi điện AI
+            Nhập API keys và cấu hình cho vBee và Twilio
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -119,6 +129,42 @@ export const VoiceSettings = ({ onSettingsChange }: VoiceSettingsProps) => {
                 <a href="https://vbee.ai/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                   vBee.ai
                 </a>
+              </p>
+            </div>
+
+            <div>
+              <Label htmlFor="twilioAccountSid">Twilio Account SID</Label>
+              <Input
+                id="twilioAccountSid"
+                type={showApiKeys ? "text" : "password"}
+                value={settings.twilioAccountSid}
+                onChange={(e) => handleSettingChange('twilioAccountSid', e.target.value)}
+                placeholder="AC••••••••••••••••••••••••••••••••"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="twilioAuthToken">Twilio Auth Token</Label>
+              <Input
+                id="twilioAuthToken"
+                type={showApiKeys ? "text" : "password"}
+                value={settings.twilioAuthToken}
+                onChange={(e) => handleSettingChange('twilioAuthToken', e.target.value)}
+                placeholder="••••••••••••••••••••••••••••••••"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="twilioPhoneNumber">Twilio Phone Number</Label>
+              <Input
+                id="twilioPhoneNumber"
+                type="text"
+                value={settings.twilioPhoneNumber}
+                onChange={(e) => handleSettingChange('twilioPhoneNumber', e.target.value)}
+                placeholder="+1234567890"
+              />
+              <p className="text-sm text-muted-foreground mt-1">
+                Số điện thoại Twilio để thực hiện cuộc gọi (bao gồm mã quốc gia)
               </p>
             </div>
 
