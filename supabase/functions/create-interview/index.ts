@@ -13,24 +13,9 @@ serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      throw new Error('Authorization header is required');
-    }
-
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    // Get user from JWT
-    const jwt = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(jwt);
-    
-    if (authError || !user) {
-      throw new Error('Invalid authentication');
-    }
-
     const { candidatePhone, recruiterId, role, language = 'vi', metadata } = await req.json();
+    
+    console.log('Create interview request:', { candidatePhone, recruiterId, role, language });
 
     if (!candidatePhone || !recruiterId) {
       return new Response(JSON.stringify({ error: 'candidatePhone and recruiterId are required' }), {
@@ -38,6 +23,10 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Create interview record
     const { data: interview, error } = await supabase
@@ -57,6 +46,8 @@ serve(async (req) => {
       console.error('Database error:', error);
       throw new Error('Failed to create interview');
     }
+
+    console.log('Interview created successfully:', interview.id);
 
     return new Response(JSON.stringify({
       id: interview.id,

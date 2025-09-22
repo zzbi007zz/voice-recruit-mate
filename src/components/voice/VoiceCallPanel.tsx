@@ -171,7 +171,7 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
       const { data: interviewData, error: interviewError } = await supabase.functions.invoke('create-interview', {
         body: {
           candidatePhone: candidate.phone,
-          recruiterId: 'demo-recruiter-id', // In real app, get from auth
+          recruiterId: '00000000-0000-0000-0000-000000000000', // Demo UUID for testing
           role: candidate.position,
           language: settings.language,
           metadata: {

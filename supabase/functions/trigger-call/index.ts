@@ -13,13 +13,10 @@ serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      throw new Error('Authorization header is required');
-    }
-
     const url = new URL(req.url);
     const interviewId = url.pathname.split('/').pop()?.replace('/call', '');
+    
+    console.log('Trigger call request for interview:', interviewId);
     
     if (!interviewId) {
       return new Response(JSON.stringify({ error: 'Interview ID is required' }), {
@@ -32,28 +29,22 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get user from JWT
-    const jwt = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(jwt);
-    
-    if (authError || !user) {
-      throw new Error('Invalid authentication');
-    }
-
-    // Get interview details
+    // Get interview details (removed auth check for demo)
     const { data: interview, error: fetchError } = await supabase
       .from('interviews')
       .select('*')
       .eq('id', interviewId)
-      .eq('recruiter_id', user.id)
       .single();
 
     if (fetchError || !interview) {
+      console.error('Interview fetch error:', fetchError);
       return new Response(JSON.stringify({ error: 'Interview not found' }), {
         status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    console.log('Found interview:', { id: interview.id, phone: interview.candidate_phone });
 
     const TWILIO_ACCOUNT_SID = Deno.env.get('TWILIO_ACCOUNT_SID');
     const TWILIO_AUTH_TOKEN = Deno.env.get('TWILIO_AUTH_TOKEN');
