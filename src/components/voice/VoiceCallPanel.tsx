@@ -11,22 +11,18 @@ import {
   Phone, 
   PhoneCall, 
   PhoneOff,
-  Mic, 
-  MicOff, 
   Volume2, 
   VolumeX, 
-  Play, 
-  Square, 
   Info,
   Settings,
   Clock,
   AlertTriangle
 } from 'lucide-react';
-import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { VoiceSettings } from './VoiceSettings';
 import { useToast } from '@/components/ui/use-toast';
 import InterviewProgress from '../interviews/InterviewProgress';
+import { useRealtimeChat } from '@/hooks/useRealtimeChat';
 
 interface CallSession {
   id: string;
@@ -48,8 +44,6 @@ interface VoiceCallPanelProps {
 
 export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: VoiceCallPanelProps) => {
   const [currentCall, setCurrentCall] = useState<CallSession | null>(null);
-  const [isMuted, setIsMuted] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
   const [selectedCandidate, setSelectedCandidate] = useState('');
   const [aiPrompt, setAiPrompt] = useState('Thực hiện cuộc phỏng vấn chuyên nghiệp, tập trung vào kỹ năng kỹ thuật và sự phù hợp văn hóa. Hãy hỏi về kinh nghiệm làm việc, dự án đã thực hiện và mục tiêu nghề nghiệp.');
   const [settings, setSettings] = useState<any | null>(null);
@@ -57,8 +51,26 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
   const [timeRemaining, setTimeRemaining] = useState<number>(0);
   const [candidates, setCandidates] = useState<any[]>([]);
   const [callStatus, setCallStatus] = useState<'idle' | 'connecting' | 'ringing' | 'active' | 'completed' | 'failed'>('idle');
-  const [callError, setCallError] = useState<string>('');
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const { toast } = useToast();
+
+  // Initialize realtime chat
+  const realtimeChat = useRealtimeChat({
+    interviewId: currentCall?.id,
+    aiPrompt,
+    onStatusChange: (status) => {
+      if (status === 'connected') {
+        setCallStatus('active');
+      } else if (status === 'connecting') {
+        setCallStatus('connecting');
+      } else if (status === 'error') {
+        setCallStatus('failed');
+      } else {
+        setCallStatus('idle');
+      }
+    },
+    onSpeakingChange: setIsSpeaking
+  });
 
   // Fetch candidates from database
   useEffect(() => {
@@ -88,26 +100,26 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
     {
       id: '1',
       candidateName: 'Nguyễn Văn An',
-      candidatePhone: '+84 901 234 567',
+      candidatePhone: 'Web Call',
       duration: 1847, // seconds
       status: 'completed',
-      transcript: 'Cuộc gọi sàng lọc ban đầu thảo luận về kinh nghiệm React và portfolio dự án...',
+      transcript: 'Cuộc phỏng vấn AI thảo luận về kinh nghiệm React và portfolio dự án...',
       aiInsights: 'Nền tảng kỹ thuật vững chắc, kỹ năng giao tiếp tốt, có vẻ nhiệt tình với vị trí này.',
     },
     {
       id: '2',
       candidateName: 'Trần Thị Minh',
-      candidatePhone: '+84 902 345 678',
+      candidatePhone: 'Web Call',
       duration: 2156,
       status: 'completed',
-      transcript: 'Phỏng vấn kỹ thuật về Node.js, cơ sở dữ liệu và kiến trúc hệ thống...',
+      transcript: 'Phỏng vấn AI về Node.js, cơ sở dữ liệu và kiến trúc hệ thống...',
       aiInsights: 'Kiến thức kỹ thuật xuất sắc, có kinh nghiệm với hệ thống có thể mở rộng, phương pháp giải quyết vấn đề tốt.',
     },
   ]);
 
   // Timer effect for call duration
   useEffect(() => {
-    if (currentCall?.status === 'active' && settings) {
+    if (callStatus === 'active' && settings) {
       const maxDuration = settings.maxCallDuration * 60; // Convert to seconds
       setTimeRemaining(maxDuration);
       
@@ -142,7 +154,7 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
         if (interval) clearInterval(interval);
       };
     }
-  }, [currentCall?.status, settings]);
+  }, [callStatus, settings]);
 
   const handleStartCall = async () => {
     if (!selectedCandidate) {
@@ -154,33 +166,20 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
       return;
     }
 
-    if (!settings || !settings.twilioAccountSid || !settings.twilioAuthToken || !settings.twilioPhoneNumber) {
-      toast({
-        title: "Lỗi",
-        description: 'Vui lòng cấu hình đầy đủ thông tin Twilio trước khi gọi',
-        variant: "destructive",
-      });
-      return;
-    }
-
     const candidate = candidates.find(c => c.id === selectedCandidate);
     if (!candidate) return;
 
     try {
       setCallStatus('connecting');
-      setCallError('');
       
       // Create interview record
       const { data: interview, error: createError } = await supabase.functions.invoke('create-interview', {
         body: {
-          candidatePhone: candidate.phone,
-          recruiterId: '00000000-0000-0000-0000-000000000000',
-          role: candidate.position || 'Software Developer',
-          language: settings.language,
-          metadata: {
-            aiPrompt: settings?.aiPrompt,
-            candidateName: candidate.name
-          }
+          candidateId: selectedCandidate,
+          jobTitle: candidate.position || 'Interview Position',
+          aiPrompt: aiPrompt,
+          language: 'vi',
+          maxDuration: 30
         }
       });
 
@@ -188,92 +187,30 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
         throw new Error(`Failed to create interview: ${createError.message}`);
       }
 
-      toast({
-        title: "Thành công",
-        description: "Interview created successfully",
-      });
-      
-      // Trigger the call
-      const { data: callData, error: callError } = await supabase.functions.invoke('trigger-call', {
-        body: {
-          interviewId: interview.id
-        }
-      });
-
-      if (callError) {
-        throw new Error(`Failed to initiate call: ${callError.message}`);
-      }
-
-      setCurrentCall({
+      // Create call session state
+      const newCall: CallSession = {
         id: interview.id,
         candidateName: candidate.name,
-        candidatePhone: candidate.phone,
+        candidatePhone: 'Web Call',
         duration: 0,
         status: 'connecting',
-        callSid: callData.call?.sid,
+        callSid: interview.id,
         interviewId: interview.id
-      });
-      
-      setCallStatus('ringing');
+      };
+
+      setCurrentCall(newCall);
+
+      // Connect to realtime chat
+      await realtimeChat.connect();
+
       toast({
-        title: "Đang gọi",
-        description: "Call initiated - ringing candidate...",
+        title: "Đang bắt đầu",
+        description: `Đang khởi tạo cuộc phỏng vấn AI với ${candidate.name}...`,
       });
-      
-      // Poll for call status updates
-      const pollInterval = setInterval(async () => {
-        try {
-          const { data: callSessions } = await supabase
-            .from('call_sessions')
-            .select('status')
-            .eq('call_sid', callData.callSid)
-            .single();
 
-          if (callSessions) {
-            if (callSessions.status === 'answered') {
-              setCallStatus('active');
-              setCurrentCall(prev => prev ? { ...prev, status: 'active' } : null);
-              clearInterval(pollInterval);
-              toast({
-                title: "Kết nối thành công",
-                description: "Call connected!",
-              });
-            } else if (['failed', 'busy', 'no-answer', 'canceled'].includes(callSessions.status)) {
-              setCallStatus('failed');
-              setCallError(`Call ${callSessions.status}`);
-              setCurrentCall(null);
-              clearInterval(pollInterval);
-              toast({
-                title: "Cuộc gọi thất bại",
-                description: `Call ${callSessions.status}: Please try again`,
-                variant: "destructive",
-              });
-            }
-          }
-        } catch (error) {
-          console.error('Error polling call status:', error);
-        }
-      }, 2000);
-
-      // Clear polling after 60 seconds
-      setTimeout(() => {
-        clearInterval(pollInterval);
-        if (callStatus === 'ringing') {
-          setCallStatus('failed');
-          setCallError('Call timeout - no answer');
-          setCurrentCall(null);
-          toast({
-            title: "Hết thời gian chờ",
-            description: "Call timeout - candidate did not answer",
-            variant: "destructive",
-          });
-        }
-      }, 60000);
-      
     } catch (error) {
       console.error('Error starting call:', error);
       setCallStatus('idle');
-      setCallError(error.message || "Failed to start call");
       setCurrentCall(null);
       toast({
         title: "Lỗi",
@@ -284,42 +221,48 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
   };
 
   const handleEndCall = async () => {
-    if (currentCall) {
-      try {
-        // Terminate the actual Twilio call
-        if (currentCall.callSid) {
-          await supabase.functions.invoke('end-call', {
-            body: { callSid: currentCall.callSid }
-          });
-        }
-        
-        if (callTimer) {
-          clearInterval(callTimer);
-          setCallTimer(null);
-        }
-        
-        setCurrentCall(prev => prev ? { ...prev, status: 'completed' } : null);
-        setCallStatus('idle');
-        setIsRecording(false);
-        toast({
-          title: "Cuộc gọi đã kết thúc",
-          description: "Đang xử lý phân tích AI...",
-        });
-        
-        // Reset after a delay
-        setTimeout(() => {
-          setCurrentCall(null);
-          setSelectedCandidate('');
-          setTimeRemaining(0);
-        }, 3000);
-      } catch (error) {
-        console.error('Error ending call:', error);
-        toast({
-          title: "Lỗi",
-          description: "Không thể kết thúc cuộc gọi",
-          variant: "destructive",
-        });
+    if (!currentCall) return;
+
+    try {
+      // Disconnect from realtime chat
+      realtimeChat.disconnect();
+
+      // End the interview
+      const { error } = await supabase.functions.invoke("end-interview", {
+        body: { interviewId: currentCall.id }
+      });
+
+      if (error) {
+        console.error('Error ending interview:', error);
       }
+
+      if (callTimer) {
+        clearInterval(callTimer);
+        setCallTimer(null);
+      }
+      
+      setCurrentCall(prev => prev ? { ...prev, status: 'completed' } : null);
+      setCallStatus('idle');
+      
+      toast({
+        title: "Cuộc gọi đã kết thúc",
+        description: `Phỏng vấn với ${currentCall.candidateName} đã hoàn thành`,
+      });
+
+      // Reset after a delay
+      setTimeout(() => {
+        setCurrentCall(null);
+        setSelectedCandidate('');
+        setTimeRemaining(0);
+      }, 3000);
+
+    } catch (error) {
+      console.error('Error ending call:', error);
+      toast({
+        title: "Lỗi",
+        description: "Không thể kết thúc cuộc gọi",
+        variant: "destructive",
+      });
     }
   };
 
@@ -386,23 +329,13 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
                     />
                   </div>
 
-                  {settings && settings.twilioAccountSid && settings.twilioAuthToken && settings.twilioPhoneNumber ? (
-                    <Alert className="border-success bg-success-light">
-                      <Info className="h-4 w-4" />
-                      <AlertDescription>
-                        <strong>Sẵn sàng!</strong> Hệ thống gọi điện AI đã được tích hợp với Twilio + OpenAI.
-                        Ngôn ngữ: {settings.language === 'vi' ? 'Tiếng Việt' : 'English'}. 
-                        Thời gian tối đa: {settings.maxCallDuration} phút.
-                      </AlertDescription>
-                    </Alert>
-                  ) : (
-                    <Alert className="border-warning bg-warning-light">
-                      <AlertTriangle className="h-4 w-4" />
-                      <AlertDescription>
-                        <strong>Cần cấu hình!</strong> Vui lòng chuyển sang tab "Cài đặt" để nhập thông tin Twilio.
-                      </AlertDescription>
-                    </Alert>
-                  )}
+                  <Alert className="border-success bg-success-light">
+                    <Info className="h-4 w-4" />
+                    <AlertDescription>
+                      <strong>Sẵn sàng!</strong> Hệ thống phỏng vấn AI đã được tích hợp với OpenAI Realtime API.
+                      Có thể thực hiện cuộc phỏng vấn bằng giọng nói trực tiếp trên trình duyệt.
+                    </AlertDescription>
+                  </Alert>
                 </CardContent>
               </Card>
 
@@ -411,9 +344,9 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <PhoneCall className="h-5 w-5" />
-                    {currentCall ? 'Cuộc gọi đang diễn ra' : 'Sẵn sàng gọi'}
+                    {currentCall ? 'Cuộc phỏng vấn đang diễn ra' : 'Sẵn sàng bắt đầu'}
                   </CardTitle>
-                  {currentCall?.status === 'active' && settings && (
+                  {callStatus === 'active' && settings && (
                     <CardDescription className="flex items-center gap-2">
                       <Clock className="h-4 w-4" />
                       Thời gian còn lại: {Math.max(0, Math.floor(timeRemaining / 60))}:{(Math.max(0, timeRemaining % 60)).toString().padStart(2, '0')}
@@ -423,131 +356,74 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
                 <CardContent>
                   {currentCall ? (
                     <div className="space-y-4">
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-12 w-12">
-                          <AvatarFallback className="bg-primary-light text-primary">
-                            {currentCall.candidateName.split(' ').map(n => n[0]).join('')}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <h3 className="font-semibold">{currentCall.candidateName}</h3>
-                          <p className="text-sm text-muted-foreground">{currentCall.candidatePhone}</p>
+                      <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-3 h-3 rounded-full ${
+                            callStatus === 'active' ? 'bg-green-500 animate-pulse' :
+                            callStatus === 'connecting' ? 'bg-yellow-500 animate-pulse' :
+                            callStatus === 'failed' ? 'bg-red-500' :
+                            'bg-gray-500'
+                          }`} />
+                          <div>
+                            <p className="font-medium">{currentCall.candidateName}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {callStatus === 'active' ? (isSpeaking ? 'AI đang nói...' : 'Đang lắng nghe...') :
+                               callStatus === 'connecting' ? 'Đang kết nối...' :
+                               callStatus === 'failed' ? 'Kết nối thất bại' :
+                               'Đã kết thúc'}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <Badge className={
-                          currentCall.status === 'active' ? 'bg-success-light text-success' :
-                          currentCall.status === 'connecting' ? 'bg-warning-light text-warning' :
-                          'bg-muted text-muted-foreground'
-                        }>
-                          {currentCall.status === 'active' ? 'Đang gọi' :
-                           currentCall.status === 'connecting' ? 'Đang kết nối' :
-                           currentCall.status === 'completed' ? 'Đã hoàn thành' : currentCall.status}
-                        </Badge>
                         <div className="text-right">
-                          <span className="text-sm font-mono">
-                            {formatDuration(currentCall.duration)}
-                          </span>
-                          {settings && timeRemaining > 0 && timeRemaining < 300 && (
-                            <div className="text-xs text-warning">
-                              Còn {Math.floor(timeRemaining / 60)}:{(timeRemaining % 60).toString().padStart(2, '0')}
-                            </div>
-                          )}
+                          <p className="font-mono text-lg">{formatDuration(currentCall.duration)}</p>
+                          <p className="text-sm text-muted-foreground">Thời gian</p>
                         </div>
                       </div>
 
                       <div className="flex justify-center gap-2">
                         <Button
-                          variant="outline"
                           size="sm"
-                          onClick={() => setIsMuted(!isMuted)}
-                          className={isMuted ? 'bg-destructive-light text-destructive' : ''}
-                        >
-                          {isMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-                        </Button>
-                        <Button
-                          variant="destructive"
                           onClick={handleEndCall}
-                          disabled={callStatus === 'idle' || callStatus === 'completed'}
+                          disabled={callStatus === 'idle'}
+                          variant="destructive"
                         >
-                          <Square className="h-4 w-4 mr-2" />
-                          Kết thúc
+                          <PhoneOff className="h-4 w-4 mr-2" />
+                          Kết thúc cuộc gọi
                         </Button>
                       </div>
 
-                      {isRecording && (
+                      {realtimeChat.isRecording && (
                         <div className="text-center">
                           <div className="inline-flex items-center gap-2 text-sm text-success">
                             <div className="w-2 h-2 bg-success rounded-full animate-pulse" />
-                            Đang ghi âm & phân tích cuộc trò chuyện...
+                            Đang ghi âm cuộc phỏng vấn
                           </div>
                         </div>
                       )}
                     </div>
                   ) : (
-                    <div className="text-center py-8">
-                      {callStatus === 'connecting' && (
-                        <div className="text-center space-y-4">
-                          <div className="animate-pulse">
-                            <Phone className="h-12 w-12 text-primary mx-auto mb-4" />
-                            <p className="text-lg font-semibold">Connecting...</p>
-                            <p className="text-muted-foreground">Setting up call to {candidates.find(c => c.id === selectedCandidate)?.name}</p>
-                          </div>
-                        </div>
-                      )}
-
-                      {callStatus === 'ringing' && (
-                        <div className="text-center space-y-4">
-                          <div className="animate-bounce">
-                            <Phone className="h-12 w-12 text-blue-500 mx-auto mb-4" />
-                            <p className="text-lg font-semibold">Ringing...</p>
-                            <p className="text-muted-foreground">Calling {candidates.find(c => c.id === selectedCandidate)?.name} at {candidates.find(c => c.id === selectedCandidate)?.phone}</p>
-                          </div>
-                        </div>
-                      )}
-
-                      {callStatus === 'failed' && (
-                        <div className="text-center space-y-4">
-                          <div className="text-red-500">
-                            <Phone className="h-12 w-12 mx-auto mb-4" />
-                            <p className="text-lg font-semibold">Call Failed</p>
-                            <p className="text-muted-foreground">{callError || 'Unable to connect to candidate'}</p>
-                            <Button 
-                              onClick={() => setCallStatus('idle')} 
-                              variant="outline" 
-                              className="mt-4"
-                            >
-                              Try Again
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-
-                      {callStatus === 'idle' && (
-                        <>
-                          <Phone className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                          <p className="text-muted-foreground mb-4">
-                            {!settings || !settings.twilioAccountSid || !settings.twilioAuthToken || !settings.twilioPhoneNumber
-                              ? 'Vui lòng cấu hình thông tin Twilio trong tab Cài đặt'
-                              : 'Sẵn sàng bắt đầu phỏng vấn AI'
-                            }
-                          </p>
-                          <Button 
-                            onClick={handleStartCall} 
-                            className="gap-2"
-                            disabled={!selectedCandidate || !settings?.twilioAccountSid || !settings?.twilioAuthToken || !settings?.twilioPhoneNumber}
-                          >
-                            <PhoneCall className="h-4 w-4" />
-                            Bắt đầu gọi
-                          </Button>
-                        </>
-                      )}
+                    <div className="text-center space-y-4">
+                      <Phone className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground mb-4">
+                        Sẵn sàng bắt đầu phỏng vấn AI bằng giọng nói
+                      </p>
+                      <Button
+                        size="lg"
+                        onClick={handleStartCall}
+                        disabled={!selectedCandidate || callStatus !== 'idle'}
+                        className="w-full"
+                      >
+                        <Phone className="h-5 w-5 mr-2" />
+                        {callStatus === 'connecting' ? 'Đang kết nối...' :
+                         callStatus === 'active' ? 'Phỏng vấn đang diễn ra' :
+                         'Bắt đầu phỏng vấn AI'}
+                      </Button>
                     </div>
                   )}
                 </CardContent>
               </Card>
             </div>
+            
             {/* Call History */}
             <Card>
               <CardHeader>
@@ -580,22 +456,25 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
                         </div>
                       </div>
 
-                      {call.aiInsights && (
-                        <div className="bg-accent/20 rounded-md p-3">
-                          <h5 className="font-medium text-sm mb-1">Phân tích AI</h5>
-                          <p className="text-sm text-muted-foreground">{call.aiInsights}</p>
+                      {call.transcript && (
+                        <div className="bg-muted/50 rounded p-3">
+                          <h5 className="text-sm font-medium mb-2">Tóm tắt phỏng vấn:</h5>
+                          <p className="text-sm text-muted-foreground">
+                            {call.transcript}
+                          </p>
                         </div>
                       )}
 
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm">
-                          <Play className="h-3 w-3 mr-1" />
-                          Phát lại
-                        </Button>
-                        <Button variant="outline" size="sm">
-                          Xem bản ghi
-                        </Button>
-                      </div>
+                      {call.aiInsights && (
+                        <div className="bg-primary/5 rounded p-3">
+                          <h5 className="text-sm font-medium mb-2 text-primary">
+                            AI Insights:
+                          </h5>
+                          <p className="text-sm text-muted-foreground">
+                            {call.aiInsights}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -604,21 +483,16 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
           </div>
         </TabsContent>
 
-        <TabsContent value="interview">
-          {currentCall?.interviewId ? (
-            <InterviewProgress interviewId={currentCall.interviewId} />
+        <TabsContent value="interview" className="mt-6">
+          {currentCall ? (
+            <InterviewProgress interviewId={currentCall.id} />
           ) : (
             <Card>
               <CardContent className="p-6 text-center">
-                <p className="text-gray-600">Không có cuộc phỏng vấn đang hoạt động</p>
-                <p className="text-sm text-gray-500 mt-2">Bắt đầu cuộc gọi để xem tiến trình phỏng vấn</p>
+                <p className="text-muted-foreground">Không có cuộc phỏng vấn nào đang diễn ra</p>
               </CardContent>
             </Card>
           )}
-        </TabsContent>
-
-        <TabsContent value="settings">
-          <VoiceSettings onSettingsChange={setSettings} />
         </TabsContent>
       </Tabs>
     </div>
