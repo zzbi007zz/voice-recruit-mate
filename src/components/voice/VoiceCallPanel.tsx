@@ -167,23 +167,57 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
     }
 
     const candidate = candidates.find(c => c.id === selectedCandidate);
-    if (!candidate) return;
+    console.log('Selected candidate ID:', selectedCandidate);
+    console.log('Available candidates:', candidates.map(c => ({ id: c.id, name: c.name })));
+    console.log('Found candidate:', candidate);
+    
+    if (!candidate) {
+      toast({
+        title: "Lỗi",
+        description: 'Không tìm thấy thông tin ứng viên',
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
       setCallStatus('connecting');
       
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      const recruiterId = user?.id || '00000000-0000-0000-0000-000000000000';
+      
+      console.log('Creating interview with data:', {
+        candidatePhone: candidate.phone || candidate.email || 'web-call',
+        recruiterId: recruiterId,
+        role: candidate.position || 'Interview Position',
+        language: 'vi',
+        metadata: {
+          aiPrompt: aiPrompt,
+          candidateName: candidate.name,
+          candidateId: selectedCandidate
+        }
+      });
+      
       // Create interview record
       const { data: interview, error: createError } = await supabase.functions.invoke('create-interview', {
         body: {
-          candidateId: selectedCandidate,
-          jobTitle: candidate.position || 'Interview Position',
-          aiPrompt: aiPrompt,
+          candidatePhone: candidate.phone || candidate.email || 'web-call',
+          recruiterId: recruiterId,
+          role: candidate.position || 'Interview Position',
           language: 'vi',
-          maxDuration: 30
+          metadata: {
+            aiPrompt: aiPrompt,
+            candidateName: candidate.name,
+            candidateId: selectedCandidate
+          }
         }
       });
 
+      console.log('Interview created:', interview);
+
       if (createError) {
+        console.error('Create interview error:', createError);
         throw new Error(`Failed to create interview: ${createError.message}`);
       }
 
