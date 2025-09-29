@@ -73,35 +73,89 @@ export const JobForm = ({ job, clientId, onSuccess, onCancel }: JobFormProps) =>
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("🚀 JobForm: Form submission started");
+    console.log("📊 JobForm: Form data:", formData);
+    
+    // Validate required fields
+    if (!formData.client_id?.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Please select a client",
+        variant: "destructive",
+      });
+      console.log("❌ JobForm: Validation failed - missing client_id");
+      return;
+    }
+    
+    if (!formData.title?.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Job title is required",
+        variant: "destructive",
+      });
+      console.log("❌ JobForm: Validation failed - missing title");
+      return;
+    }
+
     setLoading(true);
+    console.log("⏳ JobForm: Loading state set to true");
 
     try {
+      console.log("🔗 JobForm: Attempting Supabase operation");
+      
       if (job?.id) {
-        const { error } = await supabase
+        console.log("✏️ JobForm: Updating existing job with ID:", job.id);
+        const { error, data } = await supabase
           .from("jobs")
           .update(formData)
-          .eq("id", job.id);
+          .eq("id", job.id)
+          .select();
 
-        if (error) throw error;
+        console.log("📥 JobForm: Update response:", { error, data });
+        
+        if (error) {
+          console.error("❌ JobForm: Update error:", error);
+          throw error;
+        }
+        
         toast({ title: "Job updated successfully" });
+        console.log("✅ JobForm: Job updated successfully");
       } else {
-        const { error } = await supabase
+        console.log("➕ JobForm: Creating new job");
+        const { error, data } = await supabase
           .from("jobs")
-          .insert([formData]);
+          .insert([formData])
+          .select();
 
-        if (error) throw error;
+        console.log("📥 JobForm: Insert response:", { error, data });
+        
+        if (error) {
+          console.error("❌ JobForm: Insert error:", error);
+          throw error;
+        }
+        
         toast({ title: "Job created successfully" });
+        console.log("✅ JobForm: Job created successfully");
       }
 
+      console.log("🎯 JobForm: Calling onSuccess callback");
       onSuccess();
-    } catch (error) {
-      console.error("Error saving job:", error);
+    } catch (error: any) {
+      console.error("💥 JobForm: Error saving job:", error);
+      console.error("💥 JobForm: Error details:", {
+        message: error?.message,
+        code: error?.code,
+        details: error?.details,
+        hint: error?.hint
+      });
+      
       toast({
-        title: "Error",
-        description: "Failed to save job. Please try again.",
+        title: "Error", 
+        description: error?.message || "Failed to save job. Please try again.",
         variant: "destructive",
       });
     } finally {
+      console.log("🏁 JobForm: Setting loading to false");
       setLoading(false);
     }
   };

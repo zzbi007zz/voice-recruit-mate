@@ -44,35 +44,99 @@ export const ClientForm = ({ client, onSuccess, onCancel }: ClientFormProps) => 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("🚀 ClientForm: Form submission started");
+    console.log("📊 ClientForm: Form data:", formData);
+    
+    // Validate required fields
+    if (!formData.name?.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Client name is required",
+        variant: "destructive",
+      });
+      console.log("❌ ClientForm: Validation failed - missing name");
+      return;
+    }
+    
+    if (!formData.company?.trim()) {
+      toast({
+        title: "Validation Error", 
+        description: "Company name is required",
+        variant: "destructive",
+      });
+      console.log("❌ ClientForm: Validation failed - missing company");
+      return;
+    }
+    
+    if (!formData.email?.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Email is required",
+        variant: "destructive", 
+      });
+      console.log("❌ ClientForm: Validation failed - missing email");
+      return;
+    }
+
     setLoading(true);
+    console.log("⏳ ClientForm: Loading state set to true");
 
     try {
+      console.log("🔗 ClientForm: Attempting Supabase operation");
+      
       if (client?.id) {
-        const { error } = await supabase
+        console.log("✏️ ClientForm: Updating existing client with ID:", client.id);
+        const { error, data } = await supabase
           .from("clients")
           .update(formData)
-          .eq("id", client.id);
+          .eq("id", client.id)
+          .select();
 
-        if (error) throw error;
+        console.log("📥 ClientForm: Update response:", { error, data });
+        
+        if (error) {
+          console.error("❌ ClientForm: Update error:", error);
+          throw error;
+        }
+        
         toast({ title: "Client updated successfully" });
+        console.log("✅ ClientForm: Client updated successfully");
       } else {
-        const { error } = await supabase
+        console.log("➕ ClientForm: Creating new client");
+        const { error, data } = await supabase
           .from("clients")
-          .insert([formData]);
+          .insert([formData])
+          .select();
 
-        if (error) throw error;
+        console.log("📥 ClientForm: Insert response:", { error, data });
+        
+        if (error) {
+          console.error("❌ ClientForm: Insert error:", error);
+          throw error;
+        }
+        
         toast({ title: "Client created successfully" });
+        console.log("✅ ClientForm: Client created successfully");
       }
 
+      console.log("🎯 ClientForm: Calling onSuccess callback");
       onSuccess();
-    } catch (error) {
-      console.error("Error saving client:", error);
+    } catch (error: any) {
+      console.error("💥 ClientForm: Error saving client:", error);
+      console.error("💥 ClientForm: Error details:", {
+        message: error?.message,
+        code: error?.code,
+        details: error?.details,
+        hint: error?.hint
+      });
+      
       toast({
         title: "Error",
-        description: "Failed to save client. Please try again.",
+        description: error?.message || "Failed to save client. Please try again.",
         variant: "destructive",
       });
     } finally {
+      console.log("🏁 ClientForm: Setting loading to false");
       setLoading(false);
     }
   };
