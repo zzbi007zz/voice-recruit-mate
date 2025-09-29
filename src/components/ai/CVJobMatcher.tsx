@@ -51,7 +51,7 @@ export const CVJobMatcher = ({ selectedJob, selectedCandidate }: CVJobMatcherPro
   const [candidates, setCandidates] = useState<any[]>([]);
   const [matches, setMatches] = useState<MatchResult[]>([]);
   const [selectedJobId, setSelectedJobId] = useState(selectedJob || '');
-  const [selectedCandidateId, setSelectedCandidateId] = useState(selectedCandidate || '');
+  const [selectedCandidateId, setSelectedCandidateId] = useState(selectedCandidate || 'all');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<MatchResult | null>(null);
   const { toast } = useToast();
@@ -99,7 +99,9 @@ export const CVJobMatcher = ({ selectedJob, selectedCandidate }: CVJobMatcherPro
 
     setIsAnalyzing(true);
     try {
-      let candidatesToAnalyze = targetCandidateId ? [targetCandidateId] : candidates.map(c => c.id);
+      let candidatesToAnalyze = targetCandidateId && targetCandidateId !== 'all' 
+        ? [targetCandidateId] 
+        : candidates.map(c => c.id);
 
       for (const candidateId of candidatesToAnalyze) {
         const { data, error } = await supabase.functions.invoke('analyze-cv-job-match', {
@@ -227,7 +229,7 @@ export const CVJobMatcher = ({ selectedJob, selectedCandidate }: CVJobMatcherPro
                 <SelectValue placeholder="Tất cả ứng viên" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Tất cả ứng viên</SelectItem>
+                <SelectItem value="all">Tất cả ứng viên</SelectItem>
                 {candidates.map((candidate) => (
                   <SelectItem key={candidate.id} value={candidate.id}>
                     {candidate.name} - {candidate.position}
