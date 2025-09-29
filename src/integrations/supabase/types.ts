@@ -235,6 +235,62 @@ export type Database = {
         }
         Relationships: []
       }
+      email_logs: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          recipient_email: string
+          recipient_id: string | null
+          recipient_name: string
+          recipient_type: string
+          sent_at: string
+          status: string
+          subject: string
+          template_id: string | null
+          updated_at: string
+          variables: Json | null
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          recipient_email: string
+          recipient_id?: string | null
+          recipient_name: string
+          recipient_type: string
+          sent_at?: string
+          status?: string
+          subject: string
+          template_id?: string | null
+          updated_at?: string
+          variables?: Json | null
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          recipient_email?: string
+          recipient_id?: string | null
+          recipient_name?: string
+          recipient_type?: string
+          sent_at?: string
+          status?: string
+          subject?: string
+          template_id?: string | null
+          updated_at?: string
+          variables?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_logs_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "email_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_templates: {
         Row: {
           category: string

@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EmailTemplateManager } from '@/components/email/EmailTemplateManager';
+import { EmailHistory } from '@/components/email/EmailHistory';
 import { SalesPipeline } from '@/components/crm/SalesPipeline';
 import { CVJobMatcher } from '@/components/ai/CVJobMatcher';
 import { RecruitmentDashboard } from '@/components/analytics/RecruitmentDashboard';
@@ -14,7 +15,8 @@ import {
   Brain,
   BarChart3,
   Zap,
-  Target
+  Target,
+  History
 } from 'lucide-react';
 
 export const EnhancedRecruitmentSuite = () => {
@@ -32,18 +34,22 @@ export const EnhancedRecruitmentSuite = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="dashboard" className="flex items-center gap-2">
             <BarChart3 className="w-4 h-4" />
             Dashboard
           </TabsTrigger>
           <TabsTrigger value="email" className="flex items-center gap-2">
             <Mail className="w-4 h-4" />
-            Email Templates
+            Templates
+          </TabsTrigger>
+          <TabsTrigger value="email-history" className="flex items-center gap-2">
+            <History className="w-4 h-4" />
+            Email History
           </TabsTrigger>
           <TabsTrigger value="crm" className="flex items-center gap-2">
             <TrendingUp className="w-4 h-4" />
-            Sales Pipeline
+            CRM
           </TabsTrigger>
           <TabsTrigger value="ai-matching" className="flex items-center gap-2">
             <Brain className="w-4 h-4" />
@@ -181,6 +187,10 @@ export const EnhancedRecruitmentSuite = () => {
 
         <TabsContent value="email">
           <EmailTemplateManager />
+        </TabsContent>
+
+        <TabsContent value="email-history">
+          <EmailHistory />
         </TabsContent>
 
         <TabsContent value="crm">

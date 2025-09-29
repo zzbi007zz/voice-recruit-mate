@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Mail, Plus, Edit, Trash2, Send, Globe, Zap } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { EmailComposer } from './EmailComposer';
 
 interface EmailTemplate {
   id: string;
@@ -368,15 +369,25 @@ export const EmailTemplateManager = ({ onSendEmail }: EmailTemplateManagerProps)
                 </div>
               )}
               <div className="mt-4 flex gap-2">
-                <Button 
-                  size="sm" 
-                  variant="outline" 
-                  className="flex-1"
-                  onClick={() => onSendEmail?.(template, '')}
-                >
-                  <Send className="w-4 h-4 mr-1" />
-                  Gửi
-                </Button>
+                <EmailComposer 
+                  template={{
+                    id: template.id,
+                    name: template.name,
+                    subject: template.subject,
+                    content: template.content,
+                    variables: template.variables
+                  }}
+                  trigger={
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      className="flex-1"
+                    >
+                      <Send className="w-4 h-4 mr-1" />
+                      Soạn Email
+                    </Button>
+                  }
+                />
               </div>
             </CardContent>
           </Card>
