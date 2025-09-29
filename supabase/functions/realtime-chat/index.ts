@@ -24,9 +24,24 @@ serve(async (req) => {
   const { socket, response } = Deno.upgradeWebSocket(req);
   
   const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+  const ELEVENLABS_API_KEY = Deno.env.get('ELEVENLABS_API_KEY');
+  
   if (!OPENAI_API_KEY) {
     console.error('OpenAI API key not found');
+    socket.send(JSON.stringify({ 
+      type: 'error', 
+      message: 'OpenAI API key not configured. Please add OPENAI_API_KEY to Supabase Edge Function secrets.' 
+    }));
     return new Response("OpenAI API key not configured", { status: 500 });
+  }
+
+  if (!ELEVENLABS_API_KEY) {
+    console.error('ElevenLabs API key not found');
+    socket.send(JSON.stringify({ 
+      type: 'error', 
+      message: 'ElevenLabs API key not configured. Please add ELEVENLABS_API_KEY to Supabase Edge Function secrets.' 
+    }));
+    return new Response("ElevenLabs API key not configured", { status: 500 });
   }
 
   let openAISocket: WebSocket | null = null;
@@ -36,15 +51,36 @@ serve(async (req) => {
     console.log('Client WebSocket connected for interview:', interviewId);
     
     // Connect to OpenAI Realtime API
-    openAISocket = new WebSocket("wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01", [], {
-      headers: {
-        "Authorization": `Bearer ${OPENAI_API_KEY}`,
-        "OpenAI-Beta": "realtime=v1"
-      }
-    });
-
+    const websocketUrl = "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01";
+    openAISocket = new WebSocket(websocketUrl);
+    
+    // Send authorization in first message instead of headers
     openAISocket.onopen = () => {
       console.log('Connected to OpenAI Realtime API');
+      
+      // Send authorization
+      const authEvent = {
+        type: 'session.update',
+        session: {
+          modalities: ["text", "audio"],
+          instructions: `You are conducting a professional interview in Vietnamese. Follow the provided interview script and adapt naturally to the candidate's responses. Be conversational, professional, and engaging. Ask follow-up questions when appropriate. Speak clearly and at a moderate pace.`,
+          voice: "alloy",
+          input_audio_format: "pcm16",
+          output_audio_format: "pcm16",
+          input_audio_transcription: {
+            model: "whisper-1"
+          },
+          turn_detection: {
+            type: "server_vad",
+            threshold: 0.5,
+            prefix_padding_ms: 300,
+            silence_duration_ms: 1000
+          },
+          temperature: 0.8,
+          max_response_output_tokens: "inf"
+        }
+      };
+      
       socket.send(JSON.stringify({ type: 'connection_established' }));
     };
 
@@ -60,7 +96,7 @@ serve(async (req) => {
           type: "session.update",
           session: {
             modalities: ["text", "audio"],
-            instructions: `You are conducting a professional interview. Follow the provided interview script and adapt naturally to the candidate's responses. Be conversational, professional, and engaging. Ask follow-up questions when appropriate.`,
+            instructions: `You are conducting a professional interview in Vietnamese. Follow the provided interview script and adapt naturally to the candidate's responses. Be conversational, professional, and engaging. Ask follow-up questions when appropriate. Speak clearly and at a moderate pace.`,
             voice: "alloy",
             input_audio_format: "pcm16",
             output_audio_format: "pcm16",

@@ -18,6 +18,9 @@ import {
   Brain
 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import ApiKeyStatus from './ApiKeyStatus';
+import SetupGuide from './SetupGuide';
 
 interface VoiceSettingsProps {
   onSettingsChange?: (settings: any) => void;
@@ -41,16 +44,9 @@ const VoiceSettings: React.FC<VoiceSettingsProps> = ({ onSettingsChange }) => {
     enableRecording: true,
     enableTranscription: true,
     enableAIAnalysis: true,
-    
-    // System Status
-    openaiReady: true,
-    realtimeApiReady: true
   });
 
-  const [connectionStatus, setConnectionStatus] = useState({
-    openai: true,
-    realtime: true
-  });
+  const [isSystemReady, setIsSystemReady] = useState(false);
 
   // Load settings from localStorage
   useEffect(() => {
@@ -65,19 +61,12 @@ const VoiceSettings: React.FC<VoiceSettingsProps> = ({ onSettingsChange }) => {
   useEffect(() => {
     localStorage.setItem('voiceSettings', JSON.stringify(settings));
     if (onSettingsChange) {
-      onSettingsChange(settings);
+      onSettingsChange({
+        ...settings,
+        systemReady: isSystemReady
+      });
     }
-    
-    // Check connection status
-    checkConnections();
-  }, [settings, onSettingsChange]);
-
-  const checkConnections = () => {
-    setConnectionStatus({
-      openai: !!settings.aiPrompt,
-      realtime: settings.openaiReady && settings.realtimeApiReady
-    });
-  };
+  }, [settings, onSettingsChange, isSystemReady]);
 
   const updateSetting = (key: string, value: any) => {
     setSettings(prev => ({
@@ -88,59 +77,36 @@ const VoiceSettings: React.FC<VoiceSettingsProps> = ({ onSettingsChange }) => {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Connection Status */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Zap className="h-5 w-5" />
-              Trạng thái hệ thống
-            </CardTitle>
-            <CardDescription>
-              Hệ thống phỏng vấn AI với OpenAI Realtime API
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm flex items-center gap-2">
-                <Brain className="h-4 w-4" />
-                OpenAI Realtime API
-              </span>
-              <Badge variant="default" className="bg-green-100 text-green-800">
-                <CheckCircle className="h-3 w-3 mr-1" />
-                Hoạt động
-              </Badge>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm flex items-center gap-2">
-                <Mic className="h-4 w-4" />
-                Voice Recognition
-              </span>
-              <Badge variant="default" className="bg-green-100 text-green-800">
-                <CheckCircle className="h-3 w-3 mr-1" />
-                Sẵn sàng
-              </Badge>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm flex items-center gap-2">
-                <Volume2 className="h-4 w-4" />
-                Voice Synthesis
-              </span>
-              <Badge variant="default" className="bg-green-100 text-green-800">
-                <CheckCircle className="h-3 w-3 mr-1" />
-                Sẵn sàng
-              </Badge>
-            </div>
-            
-            <Alert className="mt-4">
-              <Info className="h-4 w-4" />
-              <AlertDescription>
-                <strong>Thông tin:</strong> Hệ thống sử dụng OpenAI Realtime API cho phỏng vấn giọng nói trực tiếp. 
-                Không cần cấu hình thêm - tất cả đã sẵn sàng hoạt động!
-              </AlertDescription>
-            </Alert>
-          </CardContent>
-        </Card>
+      <Tabs defaultValue="status" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="status">System Status</TabsTrigger>
+          <TabsTrigger value="settings">Settings</TabsTrigger>
+          <TabsTrigger value="setup">Setup Guide</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="status" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Zap className="h-5 w-5" />
+                API Configuration Status
+              </CardTitle>
+              <CardDescription>
+                Check your API keys configuration for the interview system
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ApiKeyStatus onStatusChange={setIsSystemReady} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="setup" className="space-y-6">
+          <SetupGuide />
+        </TabsContent>
+
+        <TabsContent value="settings" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         {/* AI Configuration */}
         <Card>
@@ -304,6 +270,8 @@ const VoiceSettings: React.FC<VoiceSettingsProps> = ({ onSettingsChange }) => {
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

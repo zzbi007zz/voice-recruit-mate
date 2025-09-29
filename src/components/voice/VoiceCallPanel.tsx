@@ -166,6 +166,28 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
       return;
     }
 
+    // Check API configuration before starting
+    try {
+      const { data: configCheck } = await supabase.functions.invoke('check-api-config');
+      
+      if (!configCheck?.ready) {
+        toast({
+          title: "Cấu hình API chưa sẵn sàng",
+          description: "Vui lòng cấu hình OpenAI và ElevenLabs API keys trước khi bắt đầu cuộc phỏng vấn. Kiểm tra tab 'Cài đặt' > 'Setup Guide'.",
+          variant: "destructive",
+        });
+        return;
+      }
+    } catch (error) {
+      console.error('Error checking API config:', error);
+      toast({
+        title: "Không thể kiểm tra cấu hình",
+        description: "Có lỗi xảy ra khi kiểm tra cấu hình API. Vui lòng thử lại.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const candidate = candidates.find(c => c.id === selectedCandidate);
     console.log('Selected candidate ID:', selectedCandidate);
     console.log('Available candidates:', candidates.map(c => ({ id: c.id, name: c.name })));
