@@ -151,6 +151,63 @@ export type Database = {
         }
         Relationships: []
       }
+      cv_job_matches: {
+        Row: {
+          candidate_id: string
+          created_at: string
+          culture_fit_score: number
+          detailed_analysis: Json | null
+          experience_match_score: number
+          id: string
+          job_id: string
+          overall_score: number
+          salary_match_score: number
+          skill_match_score: number
+          updated_at: string
+        }
+        Insert: {
+          candidate_id: string
+          created_at?: string
+          culture_fit_score?: number
+          detailed_analysis?: Json | null
+          experience_match_score?: number
+          id?: string
+          job_id: string
+          overall_score?: number
+          salary_match_score?: number
+          skill_match_score?: number
+          updated_at?: string
+        }
+        Update: {
+          candidate_id?: string
+          created_at?: string
+          culture_fit_score?: number
+          detailed_analysis?: Json | null
+          experience_match_score?: number
+          id?: string
+          job_id?: string
+          overall_score?: number
+          salary_match_score?: number
+          skill_match_score?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cv_job_matches_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cv_job_matches_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       demo: {
         Row: {
           id: number
@@ -175,6 +232,42 @@ export type Database = {
           request_id?: string | null
           session_id?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      email_templates: {
+        Row: {
+          category: string
+          content: string
+          created_at: string
+          id: string
+          language: string
+          name: string
+          subject: string
+          updated_at: string
+          variables: string[] | null
+        }
+        Insert: {
+          category: string
+          content: string
+          created_at?: string
+          id?: string
+          language?: string
+          name: string
+          subject: string
+          updated_at?: string
+          variables?: string[] | null
+        }
+        Update: {
+          category?: string
+          content?: string
+          created_at?: string
+          id?: string
+          language?: string
+          name?: string
+          subject?: string
+          updated_at?: string
+          variables?: string[] | null
         }
         Relationships: []
       }
@@ -350,6 +443,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      sales_leads: {
+        Row: {
+          company_name: string
+          contact_person: string
+          created_at: string
+          email: string
+          id: string
+          last_contact: string | null
+          next_action: string | null
+          next_action_date: string | null
+          notes: string | null
+          phone: string | null
+          status: string
+          updated_at: string
+          value: number | null
+        }
+        Insert: {
+          company_name: string
+          contact_person: string
+          created_at?: string
+          email: string
+          id?: string
+          last_contact?: string | null
+          next_action?: string | null
+          next_action_date?: string | null
+          notes?: string | null
+          phone?: string | null
+          status?: string
+          updated_at?: string
+          value?: number | null
+        }
+        Update: {
+          company_name?: string
+          contact_person?: string
+          created_at?: string
+          email?: string
+          id?: string
+          last_contact?: string | null
+          next_action?: string | null
+          next_action_date?: string | null
+          notes?: string | null
+          phone?: string | null
+          status?: string
+          updated_at?: string
+          value?: number | null
+        }
+        Relationships: []
       }
       transcripts: {
         Row: {

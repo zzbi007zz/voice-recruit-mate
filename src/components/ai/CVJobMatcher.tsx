@@ -35,13 +35,7 @@ interface MatchResult {
   experience_match_score: number;
   culture_fit_score: number;
   salary_match_score: number;
-  detailed_analysis: {
-    matching_skills: string[];
-    missing_skills: string[];
-    experience_gaps: string[];
-    strengths: string[];
-    recommendations: string[];
-  };
+  detailed_analysis: any;
   created_at: string;
   candidate: any;
   job: any;

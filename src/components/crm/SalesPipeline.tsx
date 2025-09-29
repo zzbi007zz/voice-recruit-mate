@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+// Note: Drag and drop will be added after dependency is installed
+// import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { Plus, Phone, Mail, Calendar, DollarSign, Users, TrendingUp, AlertCircle } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -17,13 +18,13 @@ interface Lead {
   company_name: string;
   contact_person: string;
   email: string;
-  phone: string;
-  status: 'lead' | 'prospect' | 'presentation' | 'negotiation' | 'contract' | 'closed_won' | 'closed_lost';
+  phone: string | null;
+  status: string;
   value: number;
-  notes: string;
-  last_contact: string;
-  next_action: string;
-  next_action_date: string;
+  notes: string | null;
+  last_contact: string | null;
+  next_action: string | null;
+  next_action_date: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -343,97 +344,86 @@ export const SalesPipeline = ({ onCreateClient }: SalesPipelineProps) => {
       </div>
 
       {/* Pipeline Board */}
-      <DragDropContext onDragEnd={onDragEnd}>
-        <div className="grid grid-cols-1 lg:grid-cols-7 gap-4 overflow-x-auto">
-          {Object.entries(statusConfig).map(([status, config]) => {
-            const statusLeads = getLeadsByStatus(status);
-            const IconComponent = config.icon;
-            
-            return (
-              <div key={status} className="min-w-72">
-                <div className="mb-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <IconComponent className="w-4 h-4" />
-                    <h3 className="font-medium">{config.label}</h3>
-                    <Badge variant="secondary">{statusLeads.length}</Badge>
-                  </div>
+      <div className="grid grid-cols-1 lg:grid-cols-7 gap-4 overflow-x-auto">
+        {Object.entries(statusConfig).map(([status, config]) => {
+          const statusLeads = getLeadsByStatus(status);
+          const IconComponent = config.icon;
+          
+          return (
+            <div key={status} className="min-w-72">
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <IconComponent className="w-4 h-4" />
+                  <h3 className="font-medium">{config.label}</h3>
+                  <Badge variant="secondary">{statusLeads.length}</Badge>
                 </div>
-                
-                <Droppable droppableId={status}>
-                  {(provided, snapshot) => (
-                    <div
-                      ref={provided.innerRef}
-                      {...provided.droppableProps}
-                      className={`min-h-96 p-2 rounded-lg border-2 border-dashed transition-colors ${
-                        snapshot.isDraggingOver ? 'border-primary bg-primary/5' : 'border-border'
-                      }`}
-                    >
-                      <div className="space-y-3">
-                        {statusLeads.map((lead, index) => (
-                          <Draggable key={lead.id} draggableId={lead.id} index={index}>
-                            {(provided, snapshot) => (
-                              <Card
-                                ref={provided.innerRef}
-                                {...provided.draggableProps}
-                                {...provided.dragHandleProps}
-                                className={`cursor-move transition-shadow ${
-                                  snapshot.isDragging ? 'shadow-hover' : 'hover:shadow-card'
-                                }`}
-                                onClick={() => setSelectedLead(lead)}
-                              >
-                                <CardHeader className="pb-2">
-                                  <CardTitle className="text-sm">{lead.company_name}</CardTitle>
-                                  <CardDescription className="text-xs">
-                                    {lead.contact_person}
-                                  </CardDescription>
-                                </CardHeader>
-                                <CardContent className="pt-0">
-                                  <div className="space-y-2">
-                                    <div className="text-sm font-medium text-success">
-                                      {lead.value.toLocaleString('vi-VN')} ₫
-                                    </div>
-                                    {lead.next_action && (
-                                      <div className="text-xs text-muted-foreground truncate">
-                                        Next: {lead.next_action}
-                                      </div>
-                                    )}
-                                    <div className="flex gap-1">
-                                      <Button size="sm" variant="ghost" className="h-6 w-6 p-0">
-                                        <Phone className="w-3 h-3" />
-                                      </Button>
-                                      <Button size="sm" variant="ghost" className="h-6 w-6 p-0">
-                                        <Mail className="w-3 h-3" />
-                                      </Button>
-                                      {status === 'contract' && (
-                                        <Button 
-                                          size="sm" 
-                                          variant="ghost" 
-                                          className="h-6 px-2 text-xs"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            convertToClient(lead);
-                                          }}
-                                        >
-                                          → Client
-                                        </Button>
-                                      )}
-                                    </div>
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            )}
-                          </Draggable>
-                        ))}
-                      </div>
-                      {provided.placeholder}
-                    </div>
-                  )}
-                </Droppable>
               </div>
-            );
-          })}
-        </div>
-      </DragDropContext>
+              
+              <div className="min-h-96 p-2 rounded-lg border-2 border-dashed border-border">
+                <div className="space-y-3">
+                  {statusLeads.map((lead, index) => (
+                    <Card
+                      key={lead.id}
+                      className="cursor-move transition-shadow hover:shadow-card"
+                      onClick={() => setSelectedLead(lead)}
+                    >
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm">{lead.company_name}</CardTitle>
+                        <CardDescription className="text-xs">
+                          {lead.contact_person}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <div className="space-y-2">
+                          <div className="text-sm font-medium text-success">
+                            {(Number(lead.value) || 0).toLocaleString('vi-VN')} ₫
+                          </div>
+                          {lead.next_action && (
+                            <div className="text-xs text-muted-foreground truncate">
+                              Next: {lead.next_action}
+                            </div>
+                          )}
+                          <div className="flex gap-1">
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              className="h-6 w-6 p-0"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Phone className="w-3 h-3" />
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              className="h-6 w-6 p-0"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Mail className="w-3 h-3" />
+                            </Button>
+                            {status === 'contract' && (
+                              <Button 
+                                size="sm" 
+                                variant="ghost" 
+                                className="h-6 px-2 text-xs"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  convertToClient(lead);
+                                }}
+                              >
+                                → Client
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };

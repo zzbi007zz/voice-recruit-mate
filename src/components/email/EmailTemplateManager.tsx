@@ -16,8 +16,8 @@ interface EmailTemplate {
   name: string;
   subject: string;
   content: string;
-  category: 'candidate' | 'client' | 'follow_up' | 'interview' | 'rejection' | 'offer';
-  language: 'vi' | 'en';
+  category: string;
+  language: string;
   variables: string[];
   created_at: string;
 }

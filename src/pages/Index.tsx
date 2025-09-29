@@ -14,7 +14,8 @@ import { VoiceCallPanel } from '@/components/voice/VoiceCallPanel';
 import { DashboardStats } from '@/components/dashboard/DashboardStats';
 import { JobApplicationManager } from '@/components/applications/JobApplicationManager';
 import { CandidateJobAssigner } from '@/components/applications/CandidateJobAssigner';
-import { Users, Calendar, Phone, Plus, Building2, Briefcase, FileText } from 'lucide-react';
+import { EnhancedRecruitmentSuite } from '@/components/recruitment/EnhancedRecruitmentSuite';
+import { Users, Calendar, Phone, Plus, Building2, Briefcase, FileText, Zap } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Link } from 'react-router-dom';
 
@@ -186,7 +187,11 @@ const Index = () => {
 
         {/* Main Navigation Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-8">
-          <TabsList className="grid w-full grid-cols-7 bg-card">
+          <TabsList className="grid w-full grid-cols-8 bg-card">
+            <TabsTrigger value="enhanced" className="gap-2">
+              <Zap className="h-4 w-4" />
+              Pro Suite
+            </TabsTrigger>
             <TabsTrigger value="candidates" className="gap-2">
               <Users className="h-4 w-4" />
               Candidates
@@ -215,6 +220,10 @@ const Index = () => {
               Analytics
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="enhanced" className="mt-6">
+            <EnhancedRecruitmentSuite />
+          </TabsContent>
 
           <TabsContent value="candidates" className="mt-6">
             <Card>
