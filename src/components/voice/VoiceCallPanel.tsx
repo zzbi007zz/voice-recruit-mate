@@ -47,12 +47,40 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
   const [selectedCandidate, setSelectedCandidate] = useState('');
   const [aiPrompt, setAiPrompt] = useState('Thực hiện cuộc phỏng vấn chuyên nghiệp, tập trung vào kỹ năng kỹ thuật và sự phù hợp văn hóa. Hãy hỏi về kinh nghiệm làm việc, dự án đã thực hiện và mục tiêu nghề nghiệp.');
   const [settings, setSettings] = useState<any | null>(null);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [callTimer, setCallTimer] = useState<NodeJS.Timeout | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<number>(0);
   const [candidates, setCandidates] = useState<any[]>([]);
   const [callStatus, setCallStatus] = useState<'idle' | 'connecting' | 'ringing' | 'active' | 'completed' | 'failed'>('idle');
   const [isSpeaking, setIsSpeaking] = useState(false);
   const { toast } = useToast();
+
+  // Load settings from localStorage on mount
+  useEffect(() => {
+    const savedSettings = localStorage.getItem('voiceSettings');
+    if (savedSettings) {
+      try {
+        const parsed = JSON.parse(savedSettings);
+        setSettings(parsed);
+        console.log('Settings loaded:', parsed);
+      } catch (error) {
+        console.error('Error loading settings:', error);
+      }
+    } else {
+      // Set default settings if none exist
+      const defaultSettings = {
+        callMode: 'phone',
+        language: 'vi',
+        maxCallDuration: 30,
+        autoEndCall: true,
+        enableCallTimeWarning: true,
+        warningTime: 5
+      };
+      setSettings(defaultSettings);
+      console.log('Using default settings:', defaultSettings);
+    }
+    setSettingsLoaded(true);
+  }, []);
 
   // Initialize realtime chat
   const realtimeChat = useRealtimeChat({
@@ -156,7 +184,57 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
     }
   }, [callStatus, settings]);
 
+  // Standardize phone number to international format
+  const standardizePhoneNumber = (phone: string): string | null => {
+    if (!phone) return null;
+    
+    // Remove all non-digit characters
+    let cleaned = phone.replace(/\D/g, '');
+    
+    // Handle Vietnamese phone numbers
+    if (cleaned.startsWith('84')) {
+      return '+' + cleaned;
+    } else if (cleaned.startsWith('0')) {
+      // Remove leading 0 and add +84
+      return '+84' + cleaned.substring(1);
+    } else if (cleaned.length === 9 || cleaned.length === 10) {
+      // Assume it's a Vietnamese number without country code
+      return '+84' + cleaned;
+    }
+    
+    // If it doesn't start with +, add it
+    if (!phone.startsWith('+')) {
+      return '+' + cleaned;
+    }
+    
+    return phone;
+  };
+
+  // Validate phone number
+  const validatePhoneNumber = (phone: string): boolean => {
+    if (!phone) return false;
+    const standardized = standardizePhoneNumber(phone);
+    if (!standardized) return false;
+    
+    // Basic validation: must start with + and have at least 10 digits
+    return /^\+\d{10,15}$/.test(standardized);
+  };
+
   const handleStartCall = async () => {
+    console.log('=== START CALL DEBUG ===');
+    console.log('Settings loaded:', settingsLoaded);
+    console.log('Current settings:', settings);
+    console.log('Selected candidate:', selectedCandidate);
+    
+    if (!settingsLoaded) {
+      toast({
+        title: "Đang tải cài đặt",
+        description: 'Vui lòng đợi hệ thống tải cài đặt...',
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!selectedCandidate) {
       toast({
         title: "Lỗi",
@@ -166,9 +244,63 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
       return;
     }
 
+    const candidate = candidates.find(c => c.id === selectedCandidate);
+    console.log('Found candidate:', candidate);
+    
+    if (!candidate) {
+      toast({
+        title: "Lỗi",
+        description: 'Không tìm thấy thông tin ứng viên',
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate phone number for phone mode
+    if (settings?.callMode === 'phone') {
+      console.log('Phone mode enabled, validating phone number...');
+      console.log('Raw phone number:', candidate.phone);
+      
+      if (!candidate.phone) {
+        toast({
+          title: "Thiếu số điện thoại",
+          description: 'Ứng viên này không có số điện thoại. Vui lòng cập nhật số điện thoại hoặc chuyển sang chế độ "Web Call".',
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const standardizedPhone = standardizePhoneNumber(candidate.phone);
+      console.log('Standardized phone:', standardizedPhone);
+      
+      if (!validatePhoneNumber(candidate.phone)) {
+        toast({
+          title: "Số điện thoại không hợp lệ",
+          description: `Số điện thoại "${candidate.phone}" không đúng định dạng. Vui lòng sử dụng định dạng: +84XXXXXXXXX hoặc 0XXXXXXXXX`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Update candidate phone with standardized version
+      candidate.phone = standardizedPhone;
+      console.log('Using standardized phone:', candidate.phone);
+    }
+
     // Check API configuration before starting
     try {
-      const { data: configCheck } = await supabase.functions.invoke('check-api-config');
+      const { data: configCheck, error: configError } = await supabase.functions.invoke('check-api-config');
+      console.log('Config check result:', configCheck, configError);
+      
+      if (configError) {
+        console.error('Config check error:', configError);
+        toast({
+          title: "Lỗi kiểm tra cấu hình",
+          description: configError.message || "Không thể kiểm tra cấu hình API",
+          variant: "destructive",
+        });
+        return;
+      }
       
       if (!configCheck?.ready) {
         toast({
@@ -182,21 +314,7 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
       console.error('Error checking API config:', error);
       toast({
         title: "Không thể kiểm tra cấu hình",
-        description: "Có lỗi xảy ra khi kiểm tra cấu hình API. Vui lòng thử lại.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const candidate = candidates.find(c => c.id === selectedCandidate);
-    console.log('Selected candidate ID:', selectedCandidate);
-    console.log('Available candidates:', candidates.map(c => ({ id: c.id, name: c.name })));
-    console.log('Found candidate:', candidate);
-    
-    if (!candidate) {
-      toast({
-        title: "Lỗi",
-        description: 'Không tìm thấy thông tin ứng viên',
+        description: error.message || "Có lỗi xảy ra khi kiểm tra cấu hình API. Vui lòng thử lại.",
         variant: "destructive",
       });
       return;
@@ -204,6 +322,10 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
 
     try {
       setCallStatus('connecting');
+      toast({
+        title: "Đang khởi tạo",
+        description: `Đang tạo phiên phỏng vấn với ${candidate.name}...`,
+      });
       
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
@@ -213,11 +335,12 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
         candidatePhone: candidate.phone || candidate.email || 'web-call',
         recruiterId: recruiterId,
         role: candidate.position || 'Interview Position',
-        language: 'vi',
+        language: settings?.language || 'vi',
         metadata: {
           aiPrompt: aiPrompt,
           candidateName: candidate.name,
-          candidateId: selectedCandidate
+          candidateId: selectedCandidate,
+          callMode: settings?.callMode
         }
       });
       
@@ -227,20 +350,25 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
           candidatePhone: candidate.phone || candidate.email || 'web-call',
           recruiterId: recruiterId,
           role: candidate.position || 'Interview Position',
-          language: 'vi',
+          language: settings?.language || 'vi',
           metadata: {
             aiPrompt: aiPrompt,
             candidateName: candidate.name,
-            candidateId: selectedCandidate
+            candidateId: selectedCandidate,
+            callMode: settings?.callMode
           }
         }
       });
 
-      console.log('Interview created:', interview);
+      console.log('Interview creation response:', { interview, createError });
 
       if (createError) {
         console.error('Create interview error:', createError);
-        throw new Error(`Failed to create interview: ${createError.message}`);
+        throw new Error(`Không thể tạo phiên phỏng vấn: ${createError.message}`);
+      }
+
+      if (!interview?.id) {
+        throw new Error('Không nhận được ID phiên phỏng vấn');
       }
 
       // Create call session state
@@ -257,7 +385,14 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
       setCurrentCall(newCall);
 
       // Check if we should make a phone call or web call
+      console.log('Checking call mode:', settings?.callMode);
+      console.log('Has phone:', !!candidate.phone);
+      
       if (settings?.callMode === 'phone' && candidate.phone) {
+        console.log('=== INITIATING PHONE CALL ===');
+        console.log('Interview ID:', interview.id);
+        console.log('Phone number:', candidate.phone);
+        
         // Make actual phone call via Twilio
         setCallStatus('ringing');
         toast({
@@ -265,27 +400,79 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
           description: `Đang gọi điện thoại đến ${candidate.phone}...`,
         });
 
-        const { data: callData, error: callError } = await supabase.functions.invoke('trigger-call', {
-          body: { interviewId: interview.id }
-        });
+        try {
+          console.log('Invoking trigger-call function...');
+          const { data: callData, error: callError } = await supabase.functions.invoke('trigger-call', {
+            body: { interviewId: interview.id }
+          });
 
-        if (callError) {
-          throw new Error(`Không thể bắt đầu cuộc gọi: ${callError.message}`);
+          console.log('trigger-call response:', { callData, callError });
+
+          if (callError) {
+            console.error('Trigger call error:', callError);
+            throw new Error(`Không thể bắt đầu cuộc gọi: ${callError.message}`);
+          }
+
+          if (!callData) {
+            throw new Error('Không nhận được phản hồi từ hệ thống gọi điện');
+          }
+
+          console.log('Phone call initiated successfully:', callData);
+          
+          // Update call with Twilio SID
+          if (callData?.callSid) {
+            console.log('Call SID received:', callData.callSid);
+            setCurrentCall(prev => prev ? { ...prev, callSid: callData.callSid } : null);
+          }
+
+          // Monitor call status from database
+          const callSessionSubscription = supabase
+            .channel(`call-session-${interview.id}`)
+            .on(
+              'postgres_changes',
+              {
+                event: '*',
+                schema: 'public',
+                table: 'call_sessions',
+                filter: `interview_id=eq.${interview.id}`
+              },
+              (payload: any) => {
+                console.log('Call session update:', payload);
+                if (payload.new && typeof payload.new === 'object' && 'status' in payload.new) {
+                  const status = payload.new.status as string;
+                  console.log('Call status changed to:', status);
+                  
+                  if (status === 'completed' || status === 'failed' || status === 'no-answer') {
+                    setCallStatus('completed');
+                    toast({
+                      title: "Cuộc gọi kết thúc",
+                      description: `Trạng thái: ${status}`,
+                    });
+                  } else if (status === 'in-progress') {
+                    setCallStatus('active');
+                  } else if (status === 'ringing') {
+                    setCallStatus('ringing');
+                  }
+                }
+              }
+            )
+            .subscribe();
+
+          setCallStatus('active');
+          toast({
+            title: "Cuộc gọi đang diễn ra",
+            description: `Đã bắt đầu cuộc gọi với ${candidate.name}`,
+          });
+
+          // Store subscription for cleanup
+          (window as any).callSubscription = callSessionSubscription;
+
+        } catch (callError) {
+          console.error('Phone call error:', callError);
+          throw callError;
         }
-
-        console.log('Phone call initiated:', callData);
-        
-        // Update call with Twilio SID
-        if (callData?.callSid) {
-          setCurrentCall(prev => prev ? { ...prev, callSid: callData.callSid } : null);
-        }
-
-        setCallStatus('active');
-        toast({
-          title: "Cuộc gọi đang diễn ra",
-          description: `Đã kết nối với ${candidate.name}`,
-        });
       } else {
+        console.log('=== INITIATING WEB CALL ===');
         // Web-based interview
         await realtimeChat.connect();
 
@@ -296,12 +483,16 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
       }
 
     } catch (error) {
-      console.error('Error starting call:', error);
+      console.error('=== ERROR STARTING CALL ===');
+      console.error('Error details:', error);
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+      
       setCallStatus('idle');
       setCurrentCall(null);
       toast({
-        title: "Lỗi",
-        description: error.message || "Failed to start call",
+        title: "Lỗi khởi tạo cuộc gọi",
+        description: error.message || "Không thể bắt đầu cuộc gọi. Vui lòng kiểm tra cấu hình và thử lại.",
         variant: "destructive",
       });
     }
@@ -311,8 +502,17 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
     if (!currentCall) return;
 
     try {
+      console.log('=== ENDING CALL ===');
+      console.log('Current call:', currentCall);
+      
       // Disconnect from realtime chat
       realtimeChat.disconnect();
+
+      // Unsubscribe from call status updates
+      if ((window as any).callSubscription) {
+        await (window as any).callSubscription.unsubscribe();
+        (window as any).callSubscription = null;
+      }
 
       // End the interview
       const { error } = await supabase.functions.invoke("end-interview", {
