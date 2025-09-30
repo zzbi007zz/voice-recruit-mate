@@ -247,7 +247,7 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
       const newCall: CallSession = {
         id: interview.id,
         candidateName: candidate.name,
-        candidatePhone: 'Web Call',
+        candidatePhone: candidate.phone || 'Web Call',
         duration: 0,
         status: 'connecting',
         callSid: interview.id,
@@ -256,13 +256,44 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
 
       setCurrentCall(newCall);
 
-      // Connect to realtime chat
-      await realtimeChat.connect();
+      // Check if we should make a phone call or web call
+      if (settings?.callMode === 'phone' && candidate.phone) {
+        // Make actual phone call via Twilio
+        setCallStatus('ringing');
+        toast({
+          title: "Đang gọi điện",
+          description: `Đang gọi điện thoại đến ${candidate.phone}...`,
+        });
 
-      toast({
-        title: "Đang bắt đầu",
-        description: `Đang khởi tạo cuộc phỏng vấn AI với ${candidate.name}...`,
-      });
+        const { data: callData, error: callError } = await supabase.functions.invoke('trigger-call', {
+          body: { interviewId: interview.id }
+        });
+
+        if (callError) {
+          throw new Error(`Không thể bắt đầu cuộc gọi: ${callError.message}`);
+        }
+
+        console.log('Phone call initiated:', callData);
+        
+        // Update call with Twilio SID
+        if (callData?.callSid) {
+          setCurrentCall(prev => prev ? { ...prev, callSid: callData.callSid } : null);
+        }
+
+        setCallStatus('active');
+        toast({
+          title: "Cuộc gọi đang diễn ra",
+          description: `Đã kết nối với ${candidate.name}`,
+        });
+      } else {
+        // Web-based interview
+        await realtimeChat.connect();
+
+        toast({
+          title: "Đang bắt đầu",
+          description: `Đang khởi tạo cuộc phỏng vấn AI với ${candidate.name}...`,
+        });
+      }
 
     } catch (error) {
       console.error('Error starting call:', error);
@@ -368,11 +399,22 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
                             <div className="flex items-center gap-2">
                               <span>{candidate.name}</span>
                               <span className="text-muted-foreground">- {candidate.position}</span>
+                              {candidate.phone && settings?.callMode === 'phone' && (
+                                <Badge variant="outline" className="text-xs">📞 {candidate.phone}</Badge>
+                              )}
                             </div>
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
+                    {selectedCandidate && settings?.callMode === 'phone' && !candidates.find(c => c.id === selectedCandidate)?.phone && (
+                      <Alert className="mt-2">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertDescription>
+                          Ứng viên này không có số điện thoại. Vui lòng chọn chế độ "Web Call" trong cài đặt hoặc cập nhật số điện thoại.
+                        </AlertDescription>
+                      </Alert>
+                    )}
                   </div>
 
                   <div>
@@ -388,8 +430,9 @@ export const VoiceCallPanel = ({ selectedCandidate: preSelectedCandidate }: Voic
                   <Alert className="border-success bg-success-light">
                     <Info className="h-4 w-4" />
                     <AlertDescription>
-                      <strong>Sẵn sàng!</strong> Hệ thống phỏng vấn AI đã được tích hợp với OpenAI Realtime API.
-                      Có thể thực hiện cuộc phỏng vấn bằng giọng nói trực tiếp trên trình duyệt.
+                      <strong>Sẵn sàng!</strong> {settings?.callMode === 'phone' 
+                        ? 'Hệ thống sẽ gọi điện thoại cho ứng viên qua Twilio.'
+                        : 'Cuộc phỏng vấn AI diễn ra trực tiếp trên trình duyệt.'}
                     </AlertDescription>
                   </Alert>
                 </CardContent>

@@ -29,6 +29,7 @@ interface VoiceSettingsProps {
 const VoiceSettings: React.FC<VoiceSettingsProps> = ({ onSettingsChange }) => {
   const [settings, setSettings] = useState({
     // Call Settings
+    callMode: 'phone', // 'phone' or 'web'
     language: 'vi',
     maxCallDuration: 30, // minutes
     autoEndCall: true,
@@ -176,6 +177,26 @@ const VoiceSettings: React.FC<VoiceSettingsProps> = ({ onSettingsChange }) => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="callMode">Chế độ cuộc gọi</Label>
+            <Select value={settings.callMode} onValueChange={(value) => updateSetting('callMode', value)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="phone">Cuộc gọi điện thoại (Twilio)</SelectItem>
+                <SelectItem value="web">Cuộc gọi trên web (Trình duyệt)</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {settings.callMode === 'phone' 
+                ? 'Hệ thống sẽ gọi điện thoại cho ứng viên qua Twilio'
+                : 'Cuộc phỏng vấn diễn ra trực tiếp trên trình duyệt'}
+            </p>
+          </div>
+
+          <Separator />
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="maxCallDuration">Thời gian tối đa (phút)</Label>
